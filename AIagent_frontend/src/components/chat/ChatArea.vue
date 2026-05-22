@@ -1,0 +1,90 @@
+<script setup>
+import { ref, watch, nextTick } from 'vue'
+import MessageBubble from './MessageBubble.vue'
+import ChatEmpty from './ChatEmpty.vue'
+import Composer from './Composer.vue'
+import StatusBar from './StatusBar.vue'
+
+const props = defineProps({
+  messages: { type: Array, default: () => [] },
+  isStreaming: { type: Boolean, default: false },
+  conversation: { type: Object, default: null }
+})
+
+const emit = defineEmits(['send', 'stop', 'regenerate', 'reaction'])
+
+const messagesContainer = ref(null)
+const prevScrollHeight = ref(0)
+
+watch(
+  () => props.messages.length,
+  async (newLen, oldLen) => {
+    await nextTick()
+    if (!messagesContainer.value) return
+    const el = messagesContainer.value
+    const wasNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    // Only auto-scroll if user was near bottom OR this is initial load
+    if (wasNearBottom || oldLen === 0) {
+      el.scrollTop = el.scrollHeight
+    }
+  },
+  { flush: 'post' }
+)
+</script>
+
+<template>
+  <div class="chat-area">
+    <div class="chat-title">
+      <span class="title-text">
+        {{ conversation?.title || conversation?.agentName || '新对话' }}
+      </span>
+    </div>
+
+    <div ref="messagesContainer" class="messages-container">
+      <ChatEmpty v-if="messages.length === 0" />
+
+      <MessageBubble
+        v-for="msg in messages"
+        :key="msg.id"
+        :message="msg"
+        @regenerate="emit('regenerate', $event)"
+        @reaction="(msgId, type) => emit('reaction', msgId, type)"
+      />
+    </div>
+
+    <Composer
+      :disabled="isStreaming"
+      :placeholder="conversation ? '输入消息...' : '选择一个 Agent 开始对话...'"
+      @send="emit('send', $event)"
+      @stop="emit('stop')"
+    />
+  </div>
+</template>
+
+<style scoped>
+.chat-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.chat-title {
+  padding: 12px 16px;
+  border-bottom: 1px solid #E5E5EA;
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(20px);
+}
+
+.title-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1D1D1F;
+}
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 0;
+}
+</style>

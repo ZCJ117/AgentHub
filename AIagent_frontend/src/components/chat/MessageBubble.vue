@@ -1,0 +1,258 @@
+<script setup>
+import { computed } from 'vue'
+import { renderMarkdown } from '@/composables/useMarkdown'
+import { NAvatar, NButton, NCode, NTag } from 'naive-ui'
+import PlanCard from './PlanCard.vue'
+import DiffViewCard from './DiffViewCard.vue'
+import ArtifactPreviewCard from './ArtifactPreviewCard.vue'
+
+const props = defineProps({
+  message: { type: Object, required: true }
+})
+
+const emit = defineEmits([
+  'regenerate', 'reaction',
+  'cancelTask', 'retryTask',
+  'applyDiff', 'rejectDiff',
+  'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact'
+])
+
+const isUser = computed(() => props.message.role === 'user')
+const isStreaming = computed(() => props.message.status === 'streaming')
+const isError = computed(() => props.message.status === 'error')
+
+const renderedContent = computed(() => {
+  if (props.message.messageType === 'text' || props.message.messageType === 'system') {
+    return renderMarkdown(props.message.content || '')
+  }
+  return ''
+})
+
+const codeLanguage = computed(() => {
+  const match = (props.message.content || '').match(/^```(\w+)/)
+  return match ? match[1] : 'text'
+})
+
+const codeContent = computed(() => {
+  let content = props.message.content || ''
+  content = content.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')
+  return content
+})
+</script>
+
+<template>
+  <div class="message-row" :class="{ 'is-user': isUser }">
+    <NAvatar
+      v-if="!isUser"
+      :size="32"
+      :src="message.senderAgentAvatarUrl"
+      round
+      class="msg-avatar"
+    >
+      {{ (message.senderAgentName || 'AI')[0] }}
+    </NAvatar>
+
+    <div class="msg-body" :class="[`msg-type-${message.messageType}`]">
+      <div v-if="!isUser && message.senderAgentName" class="msg-agent-name">
+        {{ message.senderAgentName }}
+        <NTag v-if="message.senderAgentId" size="tiny" :bordered="false" style="margin-left: 4px">
+          Agent
+        </NTag>
+      </div>
+
+      <div
+        v-if="message.messageType === 'text' || message.messageType === 'system'"
+        class="msg-text markdown-body"
+        :class="{ 'is-system': message.messageType === 'system' }"
+        v-html="renderedContent"
+      />
+
+      <div v-else-if="message.messageType === 'code'" class="msg-code">
+        <NCode :code="codeContent" :language="codeLanguage" />
+        <NButton size="tiny" quaternary @click="navigator.clipboard?.writeText(codeContent)">
+          复制
+        </NButton>
+      </div>
+
+      <div v-else-if="message.messageType === 'image'" class="msg-image">
+        <img :src="message.content" alt="attachment" loading="lazy" />
+      </div>
+
+      <div v-else-if="message.messageType === 'file'" class="msg-file">
+        <span>📎 {{ message.content }}</span>
+        <NButton size="tiny" quaternary>下载</NButton>
+      </div>
+
+      <DiffViewCard
+        v-else-if="message.messageType === 'diff'"
+        :message="message"
+        @apply="emit('applyDiff', $event)"
+        @reject="emit('rejectDiff', $event)"
+      />
+
+      <PlanCard
+        v-else-if="message.messageType === 'plan_card'"
+        :message="message"
+        @cancel="emit('cancelTask')"
+        @retry="emit('retryTask')"
+      />
+
+      <ArtifactPreviewCard
+        v-else-if="message.messageType === 'preview_card'"
+        :message="message"
+        @preview="emit('previewArtifact', $event)"
+        @edit="emit('editArtifact', $event)"
+        @deploy="emit('deployArtifact', $event)"
+        @download="emit('downloadArtifact', $event)"
+      />
+
+      <div v-else class="msg-text">
+        {{ message.content }}
+      </div>
+
+      <div v-if="isStreaming" class="msg-status streaming">生成中...</div>
+      <div v-else-if="isError" class="msg-status error">生成失败</div>
+
+      <div v-if="!isUser && !isStreaming && !isError" class="msg-actions">
+        <NButton size="tiny" quaternary @click="navigator.clipboard?.writeText(message.content)">复制</NButton>
+        <NButton size="tiny" quaternary @click="emit('regenerate', message.id)">重新生成</NButton>
+        <NButton size="tiny" quaternary @click="emit('reaction', message.id, 'like')">👍</NButton>
+      </div>
+
+      <div v-if="message.tokenUsage" class="msg-tokens">
+        {{ message.tokenUsage.totalTokens }} tokens
+      </div>
+    </div>
+
+    <div v-if="isUser" class="msg-avatar-spacer" />
+  </div>
+</template>
+
+<style scoped>
+.message-row {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.message-row.is-user {
+  flex-direction: row-reverse;
+}
+
+.msg-avatar {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.msg-avatar-spacer {
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.msg-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.msg-agent-name {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.msg-text {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  word-break: break-word;
+}
+
+.msg-text.is-system {
+  border-left: 3px solid #2E75B6;
+  background: #F0F4FA;
+}
+
+.is-user .msg-text {
+  background: #2E75B6;
+  color: #FFFFFF;
+}
+
+.msg-code {
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+
+.msg-image img {
+  max-width: 320px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.msg-status {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.msg-status.streaming {
+  color: #2E75B6;
+}
+
+.msg-status.error {
+  color: #FF3B30;
+}
+
+.msg-actions {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.message-row:hover .msg-actions {
+  opacity: 1;
+}
+
+.msg-tokens {
+  font-size: 11px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.preview-iframe {
+  width: 100%;
+  min-height: 240px;
+  border: 1px solid #E5E5EA;
+  border-radius: 14px;
+}
+
+.markdown-body :deep(pre) {
+  background: #1D1D1F;
+  color: #F5F5F7;
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+}
+
+.markdown-body :deep(code) {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 13px;
+}
+
+.markdown-body :deep(blockquote) {
+  border-left: 3px solid #2E75B6;
+  padding-left: 12px;
+  color: #666;
+  margin: 8px 0;
+}
+</style>

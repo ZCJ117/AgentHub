@@ -1,0 +1,288 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useConversationStore } from '@/stores/conversation'
+import { useAgentStore } from '@/stores/agent'
+import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSpin } from 'naive-ui'
+import AgentSelector from '@/components/agent/AgentSelector.vue'
+
+const router = useRouter()
+const convStore = useConversationStore()
+const agentStore = useAgentStore()
+
+const showAgentSelector = ref(false)
+const selectorMode = ref('direct')
+
+onMounted(async () => {
+  await Promise.all([convStore.loadList(), agentStore.loadAgents()])
+})
+
+function selectConversation(id) {
+  convStore.setActive(id)
+  router.push(`/chat/${id}`)
+}
+
+function newDirectChat() {
+  convStore.setActive(null)
+  router.push('/chat')
+}
+
+async function handleCreateConversation(config) {
+  showAgentSelector.value = false
+  if (config.mode === 'direct') {
+    router.push('/chat')
+    agentStore.selectAgent(config.agentId)
+  } else {
+    try {
+      const result = await convStore.createGroup({
+        title: config.title,
+        orchestratorAgentId: config.orchestratorAgentId,
+        agentIds: config.agentIds,
+        schedulingMode: config.schedulingMode,
+        failurePolicy: config.failurePolicy,
+        maxParallelTasks: config.maxParallelTasks
+      })
+      if (result?.conversationId) {
+        selectConversation(result.conversationId)
+      }
+    } catch (err) {
+      console.warn('Failed to create group:', err)
+    }
+  }
+}
+
+function handlePin(id) {
+  convStore.togglePin(id)
+}
+
+function handleArchive(id) {
+  convStore.toggleArchive(id)
+}
+
+function handleDelete(id) {
+  convStore.deleteConversation(id)
+}
+
+function formatTime(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const now = new Date()
+  const diffMs = now - d
+  if (diffMs < 60000) return '刚刚'
+  if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)}分钟前`
+  if (diffMs < 86400000) return `${Math.floor(diffMs / 3600000)}小时前`
+  return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
+function contextMenuOptions(conv) {
+  return [
+    { label: conv.pinnedAt ? '取消置顶' : '置顶', key: 'pin' },
+    { label: conv.archived ? '取消归档' : '归档', key: 'archive' },
+    { label: '删除', key: 'delete' }
+  ]
+}
+
+function handleContextMenu(key, conv) {
+  if (key === 'pin') handlePin(conv.id)
+  else if (key === 'archive') handleArchive(conv.id)
+  else if (key === 'delete') handleDelete(conv.id)
+}
+</script>
+
+<template>
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <NSpace vertical :size="8" style="width: 100%">
+        <NSpace :size="8" style="width: 100%">
+          <NButton type="primary" block @click="selectorMode = 'direct'; showAgentSelector = true">
+            + 新建对话
+          </NButton>
+          <NButton block @click="selectorMode = 'group'; showAgentSelector = true">
+            + 新建群聊
+          </NButton>
+        </NSpace>
+        <NInput
+          v-model:value="convStore.searchKeyword"
+          placeholder="搜索对话..."
+          clearable
+          size="small"
+        />
+      </NSpace>
+    </div>
+
+    <div class="sidebar-list">
+      <NSpin :show="convStore.loading">
+        <div
+          v-for="conv in convStore.filteredConversations"
+          :key="conv.id"
+          class="conv-item"
+          :class="{
+            active: conv.id === convStore.activeId,
+            pinned: conv.pinnedAt
+          }"
+          @click="selectConversation(conv.id)"
+        >
+          <div class="conv-content">
+            <NAvatar
+              :size="40"
+              :src="conv.agentAvatarUrl"
+              round
+            >
+              {{ (conv.title || conv.agentName || '?')[0] }}
+            </NAvatar>
+            <div class="conv-info">
+              <div class="conv-top">
+                <span class="conv-title">
+                  {{ conv.title || conv.agentName || '未命名对话' }}
+                </span>
+                <span class="conv-time">{{ formatTime(conv.lastActiveAt) }}</span>
+              </div>
+              <div class="conv-bottom">
+                <span class="conv-preview">{{ conv.lastMessagePreview || '暂无消息' }}</span>
+                <NBadge
+                  v-if="conv.unreadCount > 0"
+                  :value="conv.unreadCount"
+                  :max="99"
+                  type="error"
+                  size="tiny"
+                />
+                <NTag
+                  v-if="conv.conversationType === 'group'"
+                  size="tiny"
+                  :bordered="false"
+                >
+                  群聊
+                </NTag>
+              </div>
+            </div>
+            <NDropdown
+              trigger="click"
+              :options="contextMenuOptions(conv)"
+              @select="(key) => handleContextMenu(key, conv)"
+            >
+              <NButton text size="tiny" @click.stop class="more-btn">⋮</NButton>
+            </NDropdown>
+          </div>
+        </div>
+
+        <div v-if="!convStore.loading && convStore.filteredConversations.length === 0" class="empty-list">
+          暂无对话
+        </div>
+      </NSpin>
+    </div>
+
+    <AgentSelector
+      :show="showAgentSelector"
+      :agents="agentStore.agents"
+      :mode="selectorMode"
+      @close="showAgentSelector = false"
+      @create="handleCreateConversation"
+    />
+  </aside>
+</template>
+
+<style scoped>
+.sidebar {
+  width: 320px;
+  min-width: 260px;
+  max-width: 400px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #F5F5F7;
+  border-right: 1px solid #E5E5EA;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 16px;
+  border-bottom: 1px solid #E5E5EA;
+}
+
+.sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.conv-item {
+  padding: 10px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-bottom: 2px;
+}
+
+.conv-item:hover {
+  background: rgba(0,0,0,0.04);
+}
+
+.conv-item.active {
+  background: rgba(46,117,182,0.1);
+}
+
+.conv-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conv-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.conv-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+
+.conv-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1D1D1F;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-time {
+  font-size: 11px;
+  color: #999;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.conv-bottom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conv-preview {
+  font-size: 12px;
+  color: #999;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.more-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.conv-item:hover .more-btn {
+  opacity: 1;
+}
+
+.empty-list {
+  text-align: center;
+  color: #999;
+  padding: 40px 0;
+  font-size: 14px;
+}
+</style>

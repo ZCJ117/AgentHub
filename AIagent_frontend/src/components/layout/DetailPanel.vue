@@ -1,0 +1,160 @@
+<script setup>
+import { computed } from 'vue'
+import { useConversationStore } from '@/stores/conversation'
+import { useOrchestratorStore } from '@/stores/orchestrator'
+import { NAvatar, NTag, NButton, NCollapse, NCollapseItem, NSpin, NSpace } from 'naive-ui'
+
+const convStore = useConversationStore()
+const orchStore = useOrchestratorStore()
+
+const conversation = computed(() => convStore.activeConversation)
+const isGroup = computed(() => conversation.value?.conversationType === 'group')
+const task = computed(() => orchStore.currentTask)
+const assignments = computed(() => orchStore.assignments)
+
+function statusIcon(status) {
+  const map = { completed: '✅', running: '⏳', failed: '❌', pending: '⏸', cancelled: '⏸' }
+  return map[status] || '⏸'
+}
+</script>
+
+<template>
+  <aside class="detail-panel" v-if="conversation">
+    <div class="panel-section">
+      <h4>对话信息</h4>
+      <div class="info-row">
+        <span class="label">类型</span>
+        <NTag size="tiny" :bordered="false">
+          {{ isGroup ? '群聊' : '单聊' }}
+        </NTag>
+      </div>
+      <div class="info-row" v-if="conversation.agentName">
+        <span class="label">Agent</span>
+        <span>{{ conversation.agentName }}</span>
+      </div>
+      <div class="info-row">
+        <span class="label">消息数</span>
+        <span>{{ conversation.messageCount || 0 }}</span>
+      </div>
+    </div>
+
+    <!-- Orchestrator task status (group chat only) -->
+    <div class="panel-section" v-if="isGroup && task">
+      <h4>任务进度</h4>
+      <div class="progress-bar">
+        <div
+          class="progress-fill"
+          :style="{ width: orchStore.progressPercent + '%' }"
+          :class="{ done: orchStore.progressPercent === 100 }"
+        />
+      </div>
+      <span class="progress-text">{{ orchStore.progressPercent }}%</span>
+
+      <div class="assignment-list" v-if="assignments.length > 0">
+        <div v-for="a in assignments" :key="a.agentName" class="assignment-item">
+          <span>{{ statusIcon(a.status) }}</span>
+          <span class="assign-agent">{{ a.agentName }}</span>
+          <span class="assign-status">{{ a.status }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-empty" v-if="!isGroup && !task">
+      <p class="empty-hint">选择对话查看详情</p>
+    </div>
+  </aside>
+</template>
+
+<style scoped>
+.detail-panel {
+  width: 320px;
+  height: 100vh;
+  background: #F5F5F7;
+  border-left: 1px solid #E5E5EA;
+  overflow-y: auto;
+  padding: 16px;
+  flex-shrink: 0;
+}
+
+.panel-section {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #E5E5EA;
+}
+
+.panel-section h4 {
+  font-size: 13px;
+  font-weight: 600;
+  color: #999;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.info-row .label {
+  color: #999;
+}
+
+.progress-bar {
+  height: 6px;
+  background: #E5E5EA;
+  border-radius: 3px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #2E75B6;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.progress-fill.done {
+  background: #34C759;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #666;
+}
+
+.assignment-list {
+  margin-top: 10px;
+}
+
+.assignment-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.assign-agent {
+  flex: 1;
+  font-weight: 500;
+}
+
+.assign-status {
+  color: #999;
+}
+
+.panel-empty {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.empty-hint {
+  font-size: 13px;
+  color: #999;
+}
+</style>
