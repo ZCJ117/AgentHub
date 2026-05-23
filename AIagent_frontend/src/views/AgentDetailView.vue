@@ -2,8 +2,10 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAgentStore } from '@/stores/agent'
-import { NAvatar, NTag, NButton, NInput, NTabs, NTabPane, NSpin, NSpace, NSwitch, NDynamicTags, NSelect } from 'naive-ui'
+import { NAvatar, NTag, NButton, NInput, NTabs, NTabPane, NSpin, NSpace, NSwitch, NDynamicTags, NSelect, NIcon } from 'naive-ui'
 import { updateAgent, deleteAgent } from '@/api/agents'
+import { CameraOutline } from '@vicons/ionicons5'
+import { getToken } from '@/utils/token'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,6 +80,32 @@ async function remove() {
     router.push('/agents')
   }
 }
+
+const agentDetail = computed(() =>
+  store.detailCache.get(Number(agentId.value)) || {}
+)
+
+const fileInput = ref(null)
+
+function triggerUpload() {
+  fileInput.value?.click()
+}
+
+async function handleAvatarUpload(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const token = getToken()
+  await fetch(`/api/v1/agents/${agentId.value}/avatar`, {
+    method: 'PUT',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData
+  })
+  store.detailCache.delete(Number(agentId.value))
+  await store.loadDetail(Number(agentId.value))
+}
 </script>
 
 <template>
@@ -89,9 +117,20 @@ async function remove() {
 
     <div class="detail-body" v-if="agentId === 'new' || store.detailCache.has(Number(agentId)) || agentId === 'new'">
       <div class="detail-sidebar">
-        <NAvatar :size="80" round :src="null" class="avatar">
-          {{ (name || 'AI')[0] }}
-        </NAvatar>
+        <div class="avatar-upload" @click="triggerUpload">
+          <NAvatar :size="80" round :src="agentDetail.avatarUrl" :fallback="(agentDetail.name || 'AI')[0]" />
+          <div class="avatar-overlay">
+            <NIcon :component="CameraOutline" />
+            <span>更换</span>
+          </div>
+          <input
+            ref="fileInput"
+            type="file"
+            accept="image/*"
+            style="display:none"
+            @change="handleAvatarUpload"
+          />
+        </div>
         <NInput v-model:value="name" placeholder="Agent 名称" class="name-input" />
         <NInput v-model:value="description" placeholder="简短描述" type="textarea" :rows="2" />
         <NSpace style="margin-top: 12px">
@@ -163,4 +202,27 @@ async function remove() {
 .detail-footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #E5E5EA; }
 .tab-placeholder { color: #999; padding: 40px 0; }
 .name-input { margin-top: 8px; }
+.avatar-upload {
+  position: relative;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  font-size: 12px;
+  gap: 4px;
+}
+.avatar-upload:hover .avatar-overlay {
+  opacity: 1;
+}
 </style>
