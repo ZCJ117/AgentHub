@@ -8,6 +8,9 @@ import { useOrchestratorStore } from '@/stores/orchestrator'
 import { useArtifactStore } from '@/stores/artifact'
 import { interruptChat } from '@/api/chat'
 import { pinMessage, unpinMessage } from '@/api/conversations'
+import { fetchReplyChain } from '@/api/messages'
+import { renderMarkdown } from '@/composables/useMarkdown'
+import { NModal, NTimeLine, NTimeLineItem } from 'naive-ui'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
 import ChatArea from '@/components/chat/ChatArea.vue'
 import TopBar from '@/components/layout/TopBar.vue'
@@ -134,6 +137,31 @@ async function handleUnpinMessage(messageId) {
   await unpinMessage(convId, messageId)
   await convStore.loadPinnedMessages(convId)
 }
+
+const replyChain = ref([])
+const showReplyChain = ref(false)
+
+async function handleShowReplyChain(messageId) {
+  try {
+    const data = await fetchReplyChain(messageId)
+    replyChain.value = Array.isArray(data) ? data : []
+    showReplyChain.value = true
+  } catch (e) {
+    console.warn('Failed to load reply chain:', e)
+  }
+}
+
+function handleReply(msg) {
+  chatStore.setReplyTo(msg)
+}
+
+function formatTimestamp(ts) {
+  if (!ts) return ''
+  const d = new Date(ts)
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  return h + ':' + m
+}
 </script>
 
 <template>
@@ -162,10 +190,25 @@ async function handleUnpinMessage(messageId) {
         @retry-task="handleRetryTask"
         @pin-message="handlePinMessage"
         @unpin-message="handleUnpinMessage"
+        @reply="handleReply"
+        @show-reply-chain="handleShowReplyChain"
       />
     </div>
     <DetailPanel @unpin-message="handleUnpinMessage" />
   </div>
+
+    <NModal v-model:show="showReplyChain" preset="card" title="回复链" style="max-width:560px">
+      <NTimeLine>
+        <NTimeLineItem
+          v-for="item in replyChain"
+          :key="item.id"
+          :title="(item.senderAgentName || '你') + ' · ' + formatTimestamp(item.createdAt || item.createTime)"
+          :color="item.role === 'user' ? '#1a73e8' : '#34a853'"
+        >
+          <div v-html="renderMarkdown((item.content || '').slice(0, 300))" />
+        </NTimeLineItem>
+      </NTimeLine>
+    </NModal>
 </template>
 
 <style scoped>
