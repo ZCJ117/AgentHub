@@ -1,12 +1,15 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { renderMarkdown } from '@/composables/useMarkdown'
-import { NAvatar, NButton, NCode, NTag, NIcon } from 'naive-ui'
+import { NAvatar, NButton, NCode, NTag, NIcon, NImage } from 'naive-ui'
 import { PinOutline, Pin } from '@vicons/ionicons5'
 import PlanCard from './PlanCard.vue'
 import DiffViewCard from './DiffViewCard.vue'
 import ArtifactPreviewCard from './ArtifactPreviewCard.vue'
 import { useArtifactStore } from '@/stores/artifact'
+import { useChatStore } from '@/stores/chat'
+
+const EMOJI_MAP = { like: '👍', dislike: '👎', regenerate: '🔄', apply_diff: '✅' }
 
 const props = defineProps({
   message: { type: Object, required: true },
@@ -14,6 +17,8 @@ const props = defineProps({
 })
 
 const artifactStore = useArtifactStore()
+const chatStore = useChatStore()
+
 const previewCardArtifact = computed(() => {
   const refId = props.message?.artifactRefs?.[0]
   if (!refId) return null
@@ -25,7 +30,8 @@ const emit = defineEmits([
   'cancelTask', 'retryTask',
   'applyDiff', 'rejectDiff',
   'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact',
-  'pinMessage', 'unpinMessage'
+  'pinMessage', 'unpinMessage',
+  'reply', 'showReplyChain'
 ])
 
 const isUser = computed(() => props.message.role === 'user')
@@ -39,6 +45,15 @@ const renderedContent = computed(() => {
   return ''
 })
 
+const reactions = computed(() => {
+  return chatStore.getReactions(props.message.id)
+})
+
+const visibleReactions = computed(() => {
+  if (props.message.role === 'assistant') return reactions.value
+  return reactions.value.filter(r => r.reactionType === 'like' || r.reactionType === 'dislike')
+})
+
 const codeLanguage = computed(() => {
   const match = (props.message.content || '').match(/^```(\w+)/)
   return match ? match[1] : 'text'
@@ -48,6 +63,12 @@ const codeContent = computed(() => {
   let content = props.message.content || ''
   content = content.replace(/^```\w*\n?/, '').replace(/\n?```$/, '')
   return content
+})
+
+onMounted(() => {
+  if (props.message.id && !isUser.value && !isStreaming.value) {
+    chatStore.loadReactions(props.message.id)
+  }
 })
 </script>
 
@@ -86,12 +107,12 @@ const codeContent = computed(() => {
       </div>
 
       <div v-else-if="message.messageType === 'image'" class="msg-image">
-        <img :src="message.content" alt="attachment" loading="lazy" />
+        <NImage :src="message.content" alt="attachment" style="max-width:320px;border-radius:14px" />
       </div>
 
       <div v-else-if="message.messageType === 'file'" class="msg-file">
         <span>📎 {{ message.content }}</span>
-        <NButton size="tiny" quaternary>下载</NButton>
+        <NButton size="tiny" quaternary @click="window.open(message.content, '_blank', 'noopener')">下载</NButton>
       </div>
 
       <DiffViewCard
@@ -125,10 +146,28 @@ const codeContent = computed(() => {
       <div v-if="isStreaming" class="msg-status streaming">生成中...</div>
       <div v-else-if="isError" class="msg-status error">生成失败</div>
 
+      <!-- Reaction tags bar -->
+      <div v-if="visibleReactions.length > 0" class="msg-reactions">
+        <span
+          v-for="r in visibleReactions"
+          :key="r.reactionType"
+          class="reaction-tag"
+          :class="{ active: r.hasMyReaction }"
+          @click="emit('reaction', props.message.id, r.reactionType)"
+        >{{ EMOJI_MAP[r.reactionType] || r.reactionType }} {{ r.count }}</span>
+      </div>
+
+      <!-- Action buttons -->
       <div v-if="!isUser && !isStreaming && !isError" class="msg-actions">
+        <NButton size="tiny" quaternary @click="emit('reply', props.message)">回复</NButton>
         <NButton size="tiny" quaternary @click="navigator.clipboard?.writeText(message.content)">复制</NButton>
         <NButton size="tiny" quaternary @click="emit('regenerate', message.id)">重新生成</NButton>
-        <NButton size="tiny" quaternary @click="emit('reaction', message.id, 'like')">👍</NButton>
+        <NButton
+          v-if="message.replyToId"
+          size="tiny"
+          quaternary
+          @click="emit('showReplyChain', message.id)"
+        >🔗 查看回复链</NButton>
         <NButton
           v-if="!isPinned"
           size="tiny"
@@ -285,5 +324,39 @@ const codeContent = computed(() => {
   padding-left: 12px;
   color: #666;
   margin: 8px 0;
+}
+
+.msg-reactions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+  margin-left: 0;
+}
+
+.reaction-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  color: #666;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.reaction-tag:hover {
+  background: rgba(46, 117, 182, 0.06);
+  border-color: #2E75B6;
+}
+
+.reaction-tag.active {
+  background: rgba(46, 117, 182, 0.1);
+  border-color: #2E75B6;
+  color: #2E75B6;
 }
 </style>
