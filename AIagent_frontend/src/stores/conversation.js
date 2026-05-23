@@ -5,7 +5,8 @@ import {
   deleteConversation as deleteConvApi,
   toggleConversationPin, toggleConversationArchive,
   updateConversationTitle,
-  createGroupConversation
+  createGroupConversation,
+  fetchPinnedMessages
 } from '@/api/conversations'
 
 export const useConversationStore = defineStore('conversation', () => {
@@ -14,6 +15,13 @@ export const useConversationStore = defineStore('conversation', () => {
   const loading = ref(false)
   const searchKeyword = ref('')
   const filter = ref('all')
+
+  const pinnedMessages = ref([])
+
+  async function loadPinnedMessages(conversationId) {
+    const res = await fetchPinnedMessages(conversationId)
+    pinnedMessages.value = res || []
+  }
 
   const activeConversation = computed(() =>
     conversations.value.find(c => c.id === activeId.value) || null
@@ -98,6 +106,7 @@ export const useConversationStore = defineStore('conversation', () => {
   return {
     conversations, activeId, loading, searchKeyword, filter,
     activeConversation, sortedConversations, filteredConversations, unreadTotal,
-    loadList, setActive, togglePin, toggleArchive, deleteConversation, createGroup
+    loadList, setActive, togglePin, toggleArchive, deleteConversation, createGroup,
+    pinnedMessages, loadPinnedMessages
   }
 })
