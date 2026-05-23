@@ -1,12 +1,15 @@
 package vip.mate.orchestrator.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronization;
 import vip.mate.exception.MateClawException;
 import vip.mate.orchestrator.model.*;
 import vip.mate.orchestrator.engine.OrchestratorEngine;
@@ -56,7 +59,12 @@ public class OrchestratorService {
             a.setRetryCount(0);
             assignmentMapper.insert(a);
         }
-        CompletableFuture.runAsync(() -> engine.execute(task));
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                CompletableFuture.runAsync(() -> engine.execute(task));
+            }
+        });
         return task;
     }
 
@@ -97,7 +105,10 @@ public class OrchestratorService {
                     .eq(OrchestratorAssignmentEntity::getTaskId, taskId)
                     .eq(OrchestratorAssignmentEntity::getStatus, "failed"));
         } else {
-            toRetry = assignmentMapper.selectBatchIds(assignmentIds);
+            toRetry = assignmentMapper.selectList(
+                new LambdaQueryWrapper<OrchestratorAssignmentEntity>()
+                    .eq(OrchestratorAssignmentEntity::getTaskId, taskId)
+                    .in(OrchestratorAssignmentEntity::getId, assignmentIds));
         }
         for (OrchestratorAssignmentEntity a : toRetry) {
             a.setStatus("pending");
@@ -107,15 +118,21 @@ public class OrchestratorService {
             assignmentMapper.updateById(a);
         }
         if (!toRetry.isEmpty()) {
-            CompletableFuture.runAsync(() -> {
-                OrchestratorTaskEntity task = taskMapper.selectById(taskId);
-                if (task != null) engine.execute(task);
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    CompletableFuture.runAsync(() -> {
+                        OrchestratorTaskEntity task = taskMapper.selectById(taskId);
+                        if (task != null) engine.execute(task);
+                    });
+                }
             });
         }
     }
 
     @Transactional
     public void cancelTask(Long taskId) {
+        engine.cancel(taskId);
         OrchestratorTaskEntity task = taskMapper.selectById(taskId);
         if (task == null) throw new MateClawException("err.orchestrator.task_not_found", "任务不存在");
         task.setStatus("cancelled");
@@ -123,7 +140,7 @@ public class OrchestratorService {
         taskMapper.updateById(task);
 
         assignmentMapper.update(null,
-            new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<OrchestratorAssignmentEntity>()
+            new LambdaUpdateWrapper<OrchestratorAssignmentEntity>()
                 .eq(OrchestratorAssignmentEntity::getTaskId, taskId)
                 .in(OrchestratorAssignmentEntity::getStatus, List.of("pending", "running"))
                 .set(OrchestratorAssignmentEntity::getStatus, "cancelled"));
