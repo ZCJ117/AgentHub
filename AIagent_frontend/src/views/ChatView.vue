@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
 import { useChatStore } from '@/stores/chat'
@@ -7,6 +7,7 @@ import { useAgentStore } from '@/stores/agent'
 import { useOrchestratorStore } from '@/stores/orchestrator'
 import { useArtifactStore } from '@/stores/artifact'
 import { interruptChat } from '@/api/chat'
+import { pinMessage, unpinMessage } from '@/api/conversations'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
 import ChatArea from '@/components/chat/ChatArea.vue'
 import TopBar from '@/components/layout/TopBar.vue'
@@ -21,6 +22,11 @@ const orchStore = useOrchestratorStore()
 const artifactStore = useArtifactStore()
 
 const composerPrefillText = ref('')
+const chatAreaRef = ref(null)
+
+provide('scrollToMessage', (messageId) => {
+  chatAreaRef.value?.scrollToMessage(messageId)
+})
 
 watch(
   () => route.params.conversationId,
@@ -28,6 +34,9 @@ watch(
     const convId = id ? Number(id) : null
     convStore.setActive(convId)
     await chatStore.initConversation(convId)
+    if (convId) {
+      await convStore.loadPinnedMessages(convId)
+    }
   },
   { immediate: true }
 )
@@ -111,6 +120,20 @@ async function handleRetryTask(taskId, assignmentIds) {
   if (!taskId) return
   await orchStore.retryAssignments(taskId, assignmentIds || [])
 }
+
+async function handlePinMessage(messageId) {
+  const convId = convStore.activeId
+  if (!convId) return
+  await pinMessage(convId, { messageId, note: '' })
+  await convStore.loadPinnedMessages(convId)
+}
+
+async function handleUnpinMessage(messageId) {
+  const convId = convStore.activeId
+  if (!convId) return
+  await unpinMessage(convId, messageId)
+  await convStore.loadPinnedMessages(convId)
+}
 </script>
 
 <template>
@@ -119,6 +142,7 @@ async function handleRetryTask(taskId, assignmentIds) {
     <div class="chat-main">
       <TopBar />
       <ChatArea
+        ref="chatAreaRef"
         :messages="chatStore.messages"
         :is-streaming="chatStore.isStreaming"
         :conversation="convStore.activeConversation"
@@ -136,6 +160,8 @@ async function handleRetryTask(taskId, assignmentIds) {
         @download-artifact="handleDownloadArtifact"
         @cancel-task="handleCancelTask"
         @retry-task="handleRetryTask"
+        @pin-message="handlePinMessage"
+        @unpin-message="handleUnpinMessage"
       />
     </div>
     <DetailPanel />
