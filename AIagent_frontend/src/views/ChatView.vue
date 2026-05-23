@@ -64,7 +64,7 @@ function handleStopGeneration() {
 async function handleInterrupt() {
   const convId = convStore.activeId
   if (!convId) return
-  await interruptChat(convId, { message: '请暂停当前任务' })
+  await interruptChat(convId, '请暂停当前任务')
   chatStore.stopGeneration()
 }
 
