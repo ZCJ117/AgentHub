@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useArtifactStore } from '@/stores/artifact'
+import { renderMarkdown } from '@/composables/useMarkdown'
 import { NButton, NTag, NCode, NSpin, NSpace, NTimeline, NTimelineItem, NModal, NSelect, NDynamicTags } from 'naive-ui'
 
 const route = useRoute()
@@ -13,10 +14,39 @@ const selectedVersion1 = ref(null)
 const selectedVersion2 = ref(null)
 const showDiff = ref(false)
 const deploying = ref(false)
+const contentLoading = ref(false)
+
+const renderedMarkdown = computed(() => renderMarkdown(store.current?.content || ''))
+
+const codeLanguage = computed(() => {
+  const ct = store.current?.contentType || ''
+  const map = {
+    'text/html': 'html',
+    'text/css': 'css',
+    'text/javascript': 'javascript',
+    'application/javascript': 'javascript',
+    'text/typescript': 'typescript',
+    'text/x-python': 'python',
+    'text/x-java': 'java',
+    'text/x-go': 'go',
+    'text/x-rust': 'rust',
+    'application/json': 'json',
+    'text/x-yaml': 'yaml',
+    'text/markdown': 'markdown',
+    'text/x-sh': 'bash',
+    'text/x-sql': 'sql'
+  }
+  return map[ct] || ct.split('/').pop() || 'text'
+})
+
+const imageUrl = computed(() => store.current?.downloadUrl || store.current?.filePath || '')
 
 onMounted(async () => {
   await store.loadDetail(artifactId.value)
   await store.loadVersions(artifactId.value)
+  contentLoading.value = true
+  await store.loadContent(artifactId.value)
+  contentLoading.value = false
 })
 
 const tags = computed({
@@ -44,7 +74,6 @@ async function handleDiff() {
     showDiff.value = true
   }
 }
-
 </script>
 
 <template>
@@ -79,22 +108,21 @@ async function handleDiff() {
       </div>
 
       <div class="detail-center">
-        <NSpin :show="!store.current">
-          <!-- HTML preview -->
-          <iframe v-if="store.current.artifactType === 'html' && store.current.filePath"
-            :src="store.current.filePath" sandbox="allow-scripts" class="preview-full" />
-          <!-- Code preview -->
-          <NCode v-else-if="store.current.artifactType === 'code'"
-            code="// Load content from API" language="javascript" />
-          <!-- Markdown -->
-          <div v-else-if="store.current.artifactType === 'markdown'" class="markdown-preview">
-            Markdown content rendered here
-          </div>
-          <!-- Image -->
-          <img v-else-if="store.current.artifactType === 'image'" :src="store.current.filePath" class="image-preview" />
-          <!-- Other -->
-          <div v-else class="generic-preview">文件类型: {{ store.current.artifactType }}</div>
-        </NSpin>
+        <NSpin v-if="contentLoading" />
+
+        <iframe v-else-if="store.current.artifactType === 'html' && store.current.content"
+          :srcdoc="store.current.content" sandbox="allow-scripts" class="preview-full" />
+
+        <NCode v-else-if="store.current.artifactType === 'code' && store.current.content"
+          :code="store.current.content" :language="codeLanguage" />
+
+        <div v-else-if="store.current.artifactType === 'markdown' && store.current.content"
+          v-html="renderedMarkdown" class="markdown-preview" />
+
+        <img v-else-if="store.current.artifactType === 'image' && imageUrl"
+          :src="imageUrl" class="image-preview" />
+
+        <div v-else class="generic-preview">文件类型: {{ store.current.artifactType }}</div>
       </div>
 
       <div class="detail-right">
