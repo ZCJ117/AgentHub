@@ -39,10 +39,13 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     const { useArtifactStore } = await import('@/stores/artifact')
     const { useOrchestratorStore } = await import('@/stores/orchestrator')
 
-    useConversationStore().loadList()
-    useAgentStore().loadAgents({ enabled: true })
-    useArtifactStore().loadList()
+    useConversationStore().setActive(null)
     useOrchestratorStore().reset()
+    await Promise.allSettled([
+      useConversationStore().loadList(),
+      useAgentStore().loadAgents({ enabled: true }),
+      useArtifactStore().loadList()
+    ])
   }
 
   return { workspaces, activeId, activeWorkspace, loadAndSelect, selectWorkspace }
