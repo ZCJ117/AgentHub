@@ -301,15 +301,84 @@ async function handleAvatarUpload(e) {
               </NSpace>
             </div>
           </NTabPane>
-          <NTabPane name="skills" tab="技能">
-            <p class="tab-placeholder">技能配置 — 开发中</p>
-          </NTabPane>
-          <NTabPane name="tools" tab="工具">
-            <p class="tab-placeholder">工具配置 — 开发中</p>
-          </NTabPane>
-          <NTabPane name="stats" tab="统计">
-            <p class="tab-placeholder">使用统计 — 开发中</p>
-          </NTabPane>
+          <template v-if="agentId !== 'new'">
+            <NTabPane name="skills" tab="技能">
+              <NSpin v-if="loadingSkills" />
+              <NSpace v-else vertical :size="16">
+                <div v-if="availableSkills.length === 0">
+                  <NEmpty description="暂未绑定技能" />
+                </div>
+                <NCheckboxGroup v-model:value="selectedSkillIds" v-else>
+                  <NSpace vertical :size="12">
+                    <NCheckbox
+                      v-for="skill in availableSkills"
+                      :key="skill.id"
+                      :value="skill.id"
+                    >
+                      <div>
+                        <NText strong>{{ skill.name }}</NText>
+                        <NText v-if="skill.description" depth="3" style="display:block;">{{ skill.description }}</NText>
+                      </div>
+                    </NCheckbox>
+                  </NSpace>
+                </NCheckboxGroup>
+                <NButton type="primary" @click="saveSkills" :loading="savingSkills" :disabled="availableSkills.length === 0">
+                  保存技能配置
+                </NButton>
+              </NSpace>
+            </NTabPane>
+
+            <NTabPane name="tools" tab="工具">
+              <NSpin v-if="loadingTools" />
+              <NSpace v-else vertical :size="16">
+                <div v-if="availableTools.length === 0">
+                  <NEmpty description="暂未绑定工具" />
+                </div>
+                <NCheckboxGroup v-model:value="selectedToolNames" v-else>
+                  <NSpace vertical :size="12">
+                    <NCheckbox
+                      v-for="tool in availableTools"
+                      :key="tool.name"
+                      :value="tool.name"
+                    >
+                      <div>
+                        <NText strong>{{ tool.name }}</NText>
+                        <NTag v-if="tool.source" :type="tool.source === 'builtin' ? 'info' : 'success'" size="tiny" style="margin-left:8px;">
+                          {{ tool.source }}
+                        </NTag>
+                        <NText v-if="tool.description" depth="3" style="display:block;margin-top:2px;">{{ tool.description }}</NText>
+                      </div>
+                    </NCheckbox>
+                  </NSpace>
+                </NCheckboxGroup>
+                <NButton type="primary" @click="saveTools" :loading="savingTools" :disabled="availableTools.length === 0">
+                  保存工具配置
+                </NButton>
+              </NSpace>
+            </NTabPane>
+
+            <NTabPane name="stats" tab="统计">
+              <NSpin v-if="loadingStats" />
+              <NGrid v-else-if="stats" cols="3" x-gap="12" y-gap="12">
+                <NGridItem>
+                  <NStatistic label="总会话数" :value="stats.totalConversations ?? 0" />
+                </NGridItem>
+                <NGridItem>
+                  <NStatistic label="总消息数" :value="stats.totalMessages ?? 0" />
+                </NGridItem>
+                <NGridItem>
+                  <NStatistic label="Token 用量" :value="stats.totalTokens ?? 0" />
+                </NGridItem>
+                <NGridItem>
+                  <NStatistic label="平均响应时间" :value="stats.avgResponseTimeMs != null ? (stats.avgResponseTimeMs / 1000).toFixed(2) + ' s' : '—'" />
+                </NGridItem>
+                <NGridItem>
+                  <NStatistic label="最后活跃" :value="stats.lastActiveAt ? formatTime(stats.lastActiveAt) : '—'" />
+                </NGridItem>
+              </NGrid>
+              <NEmpty v-else description="暂无统计数据" />
+            </NTabPane>
+          </template>
         </NTabs>
       </div>
     </div>
