@@ -92,7 +92,7 @@ public class OrchestratorEngine {
                 byStepOrder.put((long) a.getStepOrder(), a);
             }
 
-            Map<Long, Integer> inDegree = new LinkedHashMap<>();
+            Map<Long, Integer> inDegree = new ConcurrentHashMap<>();
             Map<Long, List<Long>> reverseGraph = new HashMap<>();
 
             for (OrchestratorAssignmentEntity a : assignments) {
@@ -100,8 +100,11 @@ public class OrchestratorEngine {
                 if (a.getDependencyOn() != null) {
                     OrchestratorAssignmentEntity dep = byStepOrder.get(a.getDependencyOn());
                     if (dep != null) {
-                        deps = 1;
-                        reverseGraph.computeIfAbsent(dep.getId(), k -> new ArrayList<>()).add(a.getId());
+                        String depStatus = dep.getStatus();
+                        if ("pending".equals(depStatus) || "running".equals(depStatus)) {
+                            deps = 1;
+                            reverseGraph.computeIfAbsent(dep.getId(), k -> new ArrayList<>()).add(a.getId());
+                        }
                     }
                 }
                 inDegree.put(a.getId(), deps);
@@ -137,6 +140,8 @@ public class OrchestratorEngine {
                 task.setStatus("cancelled");
                 task.setCompletedAt(LocalDateTime.now());
                 taskMapper.updateById(task);
+                eventPublisher.publishPlanUpdate(parentConvId, task.getId(), task.getTitle(),
+                    "cancelled", assignments.size(), 0, 0);
                 return;
             }
 
@@ -172,17 +177,16 @@ public class OrchestratorEngine {
         for (CompletableFuture<Void> f : ctx.futures.values()) {
             f.cancel(true);
         }
-        assignmentMapper.update(null,
-            new LambdaUpdateWrapper<OrchestratorAssignmentEntity>()
-                .eq(OrchestratorAssignmentEntity::getTaskId, taskId)
-                .in(OrchestratorAssignmentEntity::getStatus, List.of("pending", "running"))
-                .set(OrchestratorAssignmentEntity::getStatus, "cancelled"));
 
+        // Publish SSE cancellation event
         OrchestratorTaskEntity task = taskMapper.selectById(taskId);
         if (task != null) {
-            task.setStatus("cancelled");
-            task.setCompletedAt(LocalDateTime.now());
-            taskMapper.updateById(task);
+            ConversationEntity parentConv = conversationMapper.selectById(task.getConversationId());
+            if (parentConv != null) {
+                eventPublisher.publishPlanUpdate(parentConv.getConversationId(), task.getId(),
+                    task.getTitle(), "cancelled",
+                    task.getTotalAssignments() != null ? task.getTotalAssignments() : 0, 0, 0);
+            }
         }
     }
 
@@ -230,8 +234,10 @@ public class OrchestratorEngine {
                             handleFailure(a, ctx, inDegree, remaining);
                         }
 
-                        for (Long depId : reverseGraph.getOrDefault(a.getId(), List.of())) {
-                            inDegree.merge(depId, -1, Integer::sum);
+                        if (ctx.releasedDependents.add(a.getId())) {
+                            for (Long depId : reverseGraph.getOrDefault(a.getId(), List.of())) {
+                                inDegree.merge(depId, -1, Integer::sum);
+                            }
                         }
 
                         remaining.decrementAndGet();
@@ -439,6 +445,7 @@ public class OrchestratorEngine {
     static class TaskExecutionContext {
         final Long taskId;
         final ConcurrentHashMap<Long, CompletableFuture<Void>> futures = new ConcurrentHashMap<>();
+        final Set<Long> releasedDependents = ConcurrentHashMap.newKeySet();
         volatile boolean cancelled = false;
         Semaphore semaphore;
         String failurePolicy = "fail_tolerant";
