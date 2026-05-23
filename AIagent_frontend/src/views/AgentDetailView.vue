@@ -86,6 +86,7 @@ const agentDetail = computed(() =>
 )
 
 const fileInput = ref(null)
+const uploadMsg = ref('')
 
 function triggerUpload() {
   fileInput.value?.click()
@@ -117,7 +118,8 @@ async function handleAvatarUpload(e) {
     store.detailCache.delete(Number(agentId.value))
     await store.loadDetail(Number(agentId.value))
   } catch (err) {
-    window.$message?.error?.(err.message || '头像上传失败')
+    uploadMsg.value = err.message || '头像上传失败'
+    setTimeout(() => { uploadMsg.value = '' }, 3000)
   } finally {
     e.target.value = ''
   }
@@ -133,7 +135,10 @@ async function handleAvatarUpload(e) {
 
     <div class="detail-body" v-if="agentId === 'new' || store.detailCache.has(Number(agentId))">
       <div class="detail-sidebar">
-        <div class="avatar-upload" @click="triggerUpload">
+        <NAvatar v-if="agentId === 'new'" :size="80" round :src="null" class="avatar">
+	          {{ (name || 'AI')[0] }}
+	        </NAvatar>
+	        <div v-else class="avatar-upload" @click="triggerUpload">
           <NAvatar :size="80" round :src="agentDetail.avatarUrl" :fallback="(agentDetail.name || 'AI')[0]" />
           <div class="avatar-overlay">
             <NIcon :component="CameraOutline" />
@@ -147,7 +152,8 @@ async function handleAvatarUpload(e) {
             @change="handleAvatarUpload"
           />
         </div>
-        <NInput v-model:value="name" placeholder="Agent 名称" class="name-input" />
+        <span v-if="uploadMsg" style="color: #FF3B30; font-size: 12px; display: block; margin-top: 6px; text-align: center;">{{ uploadMsg }}</span>
+	        <NInput v-model:value="name" placeholder="Agent 名称" class="name-input" />
         <NInput v-model:value="description" placeholder="简短描述" type="textarea" :rows="2" />
         <NSpace style="margin-top: 12px">
           <span>启用</span>
