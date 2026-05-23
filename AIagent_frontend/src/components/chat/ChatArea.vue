@@ -8,13 +8,18 @@ import StatusBar from './StatusBar.vue'
 const props = defineProps({
   messages: { type: Array, default: () => [] },
   isStreaming: { type: Boolean, default: false },
-  conversation: { type: Object, default: null }
+  conversation: { type: Object, default: null },
+  prefillText: { type: String, default: '' }
 })
 
-const emit = defineEmits(['send', 'stop', 'regenerate', 'reaction'])
+const emit = defineEmits([
+  'send', 'stop', 'regenerate', 'reaction', 'interrupt',
+  'applyDiff', 'rejectDiff',
+  'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact',
+  'cancelTask', 'retryTask'
+])
 
 const messagesContainer = ref(null)
-const prevScrollHeight = ref(0)
 
 watch(
   () => props.messages.length,
@@ -23,7 +28,6 @@ watch(
     if (!messagesContainer.value) return
     const el = messagesContainer.value
     const wasNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-    // Only auto-scroll if user was near bottom OR this is initial load
     if (wasNearBottom || oldLen === 0) {
       el.scrollTop = el.scrollHeight
     }
@@ -49,14 +53,25 @@ watch(
         :message="msg"
         @regenerate="emit('regenerate', $event)"
         @reaction="(msgId, type) => emit('reaction', msgId, type)"
+        @apply-diff="id => emit('applyDiff', id)"
+        @reject-diff="id => emit('rejectDiff', id)"
+        @preview-artifact="id => emit('previewArtifact', id)"
+        @edit-artifact="id => emit('editArtifact', id)"
+        @deploy-artifact="id => emit('deployArtifact', id)"
+        @download-artifact="id => emit('downloadArtifact', id)"
+        @cancel-task="taskId => emit('cancelTask', taskId)"
+        @retry-task="(taskId, ids) => emit('retryTask', taskId, ids)"
       />
     </div>
 
     <Composer
       :disabled="isStreaming"
+      :is-streaming="isStreaming"
+      :prefill-text="prefillText"
       :placeholder="conversation ? '输入消息...' : '选择一个 Agent 开始对话...'"
       @send="emit('send', $event)"
       @stop="emit('stop')"
+      @interrupt="emit('interrupt')"
     />
   </div>
 </template>
@@ -77,7 +92,7 @@ watch(
 }
 
 .title-text {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #1D1D1F;
 }
