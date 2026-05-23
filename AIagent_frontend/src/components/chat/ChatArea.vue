@@ -1,9 +1,12 @@
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
+import { useConversationStore } from '@/stores/conversation'
 import MessageBubble from './MessageBubble.vue'
 import ChatEmpty from './ChatEmpty.vue'
 import Composer from './Composer.vue'
 import StatusBar from './StatusBar.vue'
+
+const convStore = useConversationStore()
 
 const props = defineProps({
   messages: { type: Array, default: () => [] },
@@ -16,10 +19,24 @@ const emit = defineEmits([
   'send', 'stop', 'regenerate', 'reaction', 'interrupt',
   'applyDiff', 'rejectDiff',
   'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact',
-  'cancelTask', 'retryTask'
+  'cancelTask', 'retryTask',
+  'pinMessage', 'unpinMessage'
 ])
 
 const messagesContainer = ref(null)
+
+const pinnedIds = computed(() =>
+  new Set((convStore.pinnedMessages || []).map(p => p.messageId))
+)
+
+function scrollToMessage(messageId) {
+  const el = document.getElementById(`msg-${messageId}`)
+  if (el && messagesContainer.value) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}
+
+defineExpose({ scrollToMessage })
 
 watch(
   () => props.messages.length,
@@ -51,6 +68,7 @@ watch(
         v-for="msg in messages"
         :key="msg.id"
         :message="msg"
+        :is-pinned="pinnedIds.has(msg.id)"
         @regenerate="emit('regenerate', $event)"
         @reaction="(msgId, type) => emit('reaction', msgId, type)"
         @apply-diff="id => emit('applyDiff', id)"
@@ -61,6 +79,8 @@ watch(
         @download-artifact="id => emit('downloadArtifact', id)"
         @cancel-task="taskId => emit('cancelTask', taskId)"
         @retry-task="(taskId, ids) => emit('retryTask', taskId, ids)"
+        @pin-message="id => emit('pinMessage', id)"
+        @unpin-message="id => emit('unpinMessage', id)"
       />
     </div>
 
