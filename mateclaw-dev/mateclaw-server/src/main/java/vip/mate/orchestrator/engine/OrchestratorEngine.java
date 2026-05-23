@@ -137,7 +137,12 @@ public class OrchestratorEngine {
                 }
             }
 
-            if (ctx.cancelled) return;
+            if (ctx.cancelled) {
+                task.setStatus("cancelled");
+                task.setCompletedAt(LocalDateTime.now());
+                taskMapper.updateById(task);
+                return;
+            }
 
             assignments = assignmentMapper.selectList(
                 new LambdaQueryWrapper<OrchestratorAssignmentEntity>()
@@ -174,6 +179,13 @@ public class OrchestratorEngine {
                 .eq(OrchestratorAssignmentEntity::getTaskId, taskId)
                 .in(OrchestratorAssignmentEntity::getStatus, List.of("pending", "running"))
                 .set(OrchestratorAssignmentEntity::getStatus, "cancelled"));
+
+        OrchestratorTaskEntity task = taskMapper.selectById(taskId);
+        if (task != null) {
+            task.setStatus("cancelled");
+            task.setCompletedAt(LocalDateTime.now());
+            taskMapper.updateById(task);
+        }
     }
 
     // ─── Scheduling ───────────────────────────────────────────────
@@ -206,7 +218,7 @@ public class OrchestratorEngine {
                         ctx.semaphore.acquire();
                         if (!ctx.cancelled) {
                             executeSingle(a, task, parentConv, parentConvId,
-                                agentNames.getOrDefault(a.getAgentId(), "unknown"), ctx);
+                                agentNames.getOrDefault(a.getAgentId(), "unknown"), ctx, inDegree);
                         }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -219,7 +231,7 @@ public class OrchestratorEngine {
 
                         if (ex != null && !ctx.cancelled) {
                             log.error("Assignment {} unexpected error", a.getId(), ex);
-                            handleFailure(a, ctx, completed, failed);
+                            handleFailure(a, ctx, completed, failed, inDegree);
                         }
 
                         for (Long depId : reverseGraph.getOrDefault(a.getId(), List.of())) {
@@ -247,7 +259,8 @@ public class OrchestratorEngine {
             ConversationEntity parentConv,
             String parentConvId,
             String agentName,
-            TaskExecutionContext ctx) {
+            TaskExecutionContext ctx,
+            Map<Long, Integer> inDegree) {
 
         a.setStatus("running");
         a.setStartedAt(LocalDateTime.now());
@@ -280,7 +293,7 @@ public class OrchestratorEngine {
 
                 eventPublisher.publishDelegationProgress(parentConvId, a.getId(), a.getAgentId(),
                     agentName, "failed", "Timeout");
-                handleFailure(a, ctx, null, null);
+                handleFailure(a, ctx, null, null, inDegree);
                 return;
             }
 
@@ -308,7 +321,7 @@ public class OrchestratorEngine {
 
             eventPublisher.publishDelegationProgress(parentConvId, a.getId(), a.getAgentId(),
                 agentName, "failed", truncateSummary(e.getMessage(), 200));
-            handleFailure(a, ctx, null, null);
+            handleFailure(a, ctx, null, null, inDegree);
         }
     }
 
@@ -316,7 +329,8 @@ public class OrchestratorEngine {
             OrchestratorAssignmentEntity a,
             TaskExecutionContext ctx,
             java.util.concurrent.atomic.AtomicInteger completed,
-            java.util.concurrent.atomic.AtomicInteger failed) {
+            java.util.concurrent.atomic.AtomicInteger failed,
+            Map<Long, Integer> inDegree) {
 
         int retries = a.getRetryCount() != null ? a.getRetryCount() : 0;
         if (retries < MAX_RETRY_COUNT) {
@@ -324,6 +338,7 @@ public class OrchestratorEngine {
             a.setRetryCount(retries + 1);
             a.setErrorMessage(null);
             assignmentMapper.updateById(a);
+            inDegree.put(a.getId(), 0);
             log.info("Assignment {} retry {}/{}", a.getId(), retries + 1, MAX_RETRY_COUNT);
             return;
         }
@@ -407,14 +422,17 @@ public class OrchestratorEngine {
     }
 
     private void incrementTaskCounter(Long taskId, String field) {
-        OrchestratorTaskEntity task = taskMapper.selectById(taskId);
-        if (task == null) return;
         if ("completedAssignments".equals(field)) {
-            task.setCompletedAssignments((task.getCompletedAssignments() != null ? task.getCompletedAssignments() : 0) + 1);
+            taskMapper.update(null,
+                new LambdaUpdateWrapper<OrchestratorTaskEntity>()
+                    .eq(OrchestratorTaskEntity::getId, taskId)
+                    .setSql("completed_assignments = COALESCE(completed_assignments, 0) + 1"));
         } else {
-            task.setFailedAssignments((task.getFailedAssignments() != null ? task.getFailedAssignments() : 0) + 1);
+            taskMapper.update(null,
+                new LambdaUpdateWrapper<OrchestratorTaskEntity>()
+                    .eq(OrchestratorTaskEntity::getId, taskId)
+                    .setSql("failed_assignments = COALESCE(failed_assignments, 0) + 1"));
         }
-        taskMapper.updateById(task);
     }
 
     // ─── Inner class ──────────────────────────────────────────────
