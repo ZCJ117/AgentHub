@@ -401,7 +401,7 @@ async function handleAvatarUpload(e) {
 .detail-main { flex: 1; }
 .config-form label { font-size: 13px; color: #666; display: block; margin-bottom: 4px; }
 .detail-footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #E5E5EA; }
-.tab-placeholder { color: #999; padding: 40px 0; }
+
 .name-input { margin-top: 8px; }
 .avatar-upload {
   position: relative;
