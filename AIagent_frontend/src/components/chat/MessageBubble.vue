@@ -1,14 +1,16 @@
 <script setup>
 import { computed } from 'vue'
 import { renderMarkdown } from '@/composables/useMarkdown'
-import { NAvatar, NButton, NCode, NTag } from 'naive-ui'
+import { NAvatar, NButton, NCode, NTag, NIcon } from 'naive-ui'
+import { PushpinOutlined, PushpinFilled } from '@vicons/ionicons5'
 import PlanCard from './PlanCard.vue'
 import DiffViewCard from './DiffViewCard.vue'
 import ArtifactPreviewCard from './ArtifactPreviewCard.vue'
 import { useArtifactStore } from '@/stores/artifact'
 
 const props = defineProps({
-  message: { type: Object, required: true }
+  message: { type: Object, required: true },
+  isPinned: { type: Boolean, default: false }
 })
 
 const artifactStore = useArtifactStore()
@@ -22,7 +24,8 @@ const emit = defineEmits([
   'regenerate', 'reaction',
   'cancelTask', 'retryTask',
   'applyDiff', 'rejectDiff',
-  'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact'
+  'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact',
+  'pinMessage', 'unpinMessage'
 ])
 
 const isUser = computed(() => props.message.role === 'user')
@@ -49,7 +52,7 @@ const codeContent = computed(() => {
 </script>
 
 <template>
-  <div class="message-row" :class="{ 'is-user': isUser }">
+  <div class="message-row" :class="{ 'is-user': isUser }" :id="'msg-' + message.id">
     <NAvatar
       v-if="!isUser"
       :size="32"
@@ -126,6 +129,25 @@ const codeContent = computed(() => {
         <NButton size="tiny" quaternary @click="navigator.clipboard?.writeText(message.content)">复制</NButton>
         <NButton size="tiny" quaternary @click="emit('regenerate', message.id)">重新生成</NButton>
         <NButton size="tiny" quaternary @click="emit('reaction', message.id, 'like')">👍</NButton>
+        <NButton
+          v-if="!isPinned"
+          size="tiny"
+          quaternary
+          @click.stop="emit('pinMessage', message.id)"
+          title="钉选消息"
+        >
+          <NIcon><PushpinOutlined /></NIcon>
+        </NButton>
+        <NButton
+          v-else
+          size="tiny"
+          quaternary
+          type="primary"
+          @click.stop="emit('unpinMessage', message.id)"
+          title="取消钉选"
+        >
+          <NIcon><PushpinFilled /></NIcon>
+        </NButton>
       </div>
 
       <div v-if="message.tokenUsage" class="msg-tokens">
