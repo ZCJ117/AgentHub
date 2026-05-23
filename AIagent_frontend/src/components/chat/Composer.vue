@@ -55,7 +55,7 @@ watch(() => props.prefillText, (val) => {
       }
     })
   }
-})
+}, { immediate: true })
 
 function getLastAtIndex(str, pos) {
   for (let i = pos - 1; i >= 0; i--) {
@@ -160,6 +160,12 @@ function handleSend() {
 function handleInterrupt() {
   emit('interrupt')
 }
+
+function closeMention() {
+  mentionOpen.value = false
+  mentionStartPos.value = -1
+  mentionQuery.value = ''
+}
 </script>
 
 <template>
@@ -182,6 +188,7 @@ function handleInterrupt() {
             rows="1"
             @input="onInput"
             @keydown="handleKeydown"
+            @blur="closeMention"
           />
         </template>
         <div class="mention-popover">
