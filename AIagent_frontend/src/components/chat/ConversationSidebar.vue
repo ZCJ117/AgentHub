@@ -3,7 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
 import { useAgentStore } from '@/stores/agent'
-import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSegment, NSpin } from 'naive-ui'
+import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSpin } from 'naive-ui'
 import AgentSelector from '@/components/agent/AgentSelector.vue'
 
 const router = useRouter()
@@ -105,16 +105,22 @@ function handleContextMenu(key, conv) {
             + 新建群聊
           </NButton>
         </NSpace>
-        <n-segment
-          v-model:value="convStore.filter"
-          :options="[
-            { label: '全部', value: 'all' },
-            { label: '单聊', value: 'direct' },
-            { label: '群聊', value: 'group' }
-          ]"
-          size="small"
-          style="width: 100%"
-        />
+        <div class="type-filter">
+          <NButton
+            v-for="opt in [
+              { label: '全部', value: 'all' },
+              { label: '单聊', value: 'direct' },
+              { label: '群聊', value: 'group' }
+            ]"
+            :key="opt.value"
+            size="small"
+            :type="convStore.filter === opt.value ? 'primary' : 'default'"
+            :ghost="convStore.filter !== opt.value"
+            @click="convStore.filter = opt.value"
+          >
+            {{ opt.label }}
+          </NButton>
+        </div>
         <NInput
           v-model:value="convStore.searchKeyword"
           placeholder="搜索对话..."
@@ -291,6 +297,17 @@ function handleContextMenu(key, conv) {
 
 .conv-item:hover .more-btn {
   opacity: 1;
+}
+
+.type-filter {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+
+.type-filter :deep(.n-button) {
+  flex: 1;
+  border-radius: 8px;
 }
 
 .empty-list {
