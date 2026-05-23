@@ -40,7 +40,7 @@ export function fetchPinnedMessages(id) {
   return apiClient.get(`/api/v1/conversations/${id}/pins`)
 }
 
-export function pinMessage(conversationId, messageId, note) {
+export function pinMessage(conversationId, { messageId, note }) {
   return apiClient.post(`/api/v1/conversations/${conversationId}/pins`, { messageId, note })
 }
 
