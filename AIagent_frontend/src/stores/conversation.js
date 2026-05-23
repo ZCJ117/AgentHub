@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
-  fetchConversations, fetchConversationDetail, fetchMessages,
+  fetchConversations, fetchConversationsPage, fetchConversationDetail, fetchMessages,
   deleteConversation as deleteConvApi,
   toggleConversationPin, toggleConversationArchive,
   updateConversationTitle,
@@ -15,6 +15,9 @@ export const useConversationStore = defineStore('conversation', () => {
   const loading = ref(false)
   const searchKeyword = ref('')
   const filter = ref('all')
+  const currentPage = ref(1)
+  const hasMore = ref(false)
+  const loadingMore = ref(false)
 
   const pinnedMessages = ref([])
 
@@ -60,12 +63,36 @@ export const useConversationStore = defineStore('conversation', () => {
   async function loadList() {
     loading.value = true
     try {
-      const params = {}
+      const params = { page: 1, size: 50 }
       if (filter.value !== 'all') params.conversationType = filter.value
-      const data = await fetchConversations(params)
-      conversations.value = Array.isArray(data) ? data : (data?.records || [])
+      if (searchKeyword.value) params.keyword = searchKeyword.value
+      const data = await fetchConversationsPage(params)
+      conversations.value = data?.records || []
+      currentPage.value = data?.current ?? 1
+      hasMore.value = (data?.current ?? 0) < (data?.pages ?? 0)
+    } catch (e) {
+      console.warn('Failed to load conversations:', e)
     } finally {
       loading.value = false
+    }
+  }
+
+  async function loadMore() {
+    if (!hasMore.value || loadingMore.value) return
+    loadingMore.value = true
+    try {
+      const params = { page: currentPage.value + 1, size: 50 }
+      if (filter.value !== 'all') params.conversationType = filter.value
+      if (searchKeyword.value) params.keyword = searchKeyword.value
+      const data = await fetchConversationsPage(params)
+      const records = data?.records || []
+      conversations.value.push(...records)
+      currentPage.value = data?.current ?? currentPage.value + 1
+      hasMore.value = (data?.current ?? 0) < (data?.pages ?? 0)
+    } catch (e) {
+      console.warn('Failed to load more conversations:', e)
+    } finally {
+      loadingMore.value = false
     }
   }
 
@@ -105,8 +132,9 @@ export const useConversationStore = defineStore('conversation', () => {
 
   return {
     conversations, activeId, loading, searchKeyword, filter,
+    currentPage, hasMore, loadingMore,
     activeConversation, sortedConversations, filteredConversations, unreadTotal,
-    loadList, setActive, togglePin, toggleArchive, deleteConversation, createGroup,
+    loadList, loadMore, setActive, togglePin, toggleArchive, deleteConversation, createGroup,
     pinnedMessages, loadPinnedMessages
   }
 })

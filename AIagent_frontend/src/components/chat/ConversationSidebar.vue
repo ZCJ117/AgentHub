@@ -78,6 +78,13 @@ function formatTime(ts) {
   return d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
 }
 
+function handleScroll(e) {
+  const { scrollHeight, scrollTop, clientHeight } = e.target
+  if (scrollHeight - scrollTop - clientHeight < 40) {
+    convStore.loadMore()
+  }
+}
+
 function contextMenuOptions(conv) {
   return [
     { label: conv.pinnedAt ? '取消置顶' : '置顶', key: 'pin' },
@@ -130,7 +137,7 @@ function handleContextMenu(key, conv) {
       </NSpace>
     </div>
 
-    <div class="sidebar-list">
+    <div class="sidebar-list" @scroll="handleScroll">
       <NSpin :show="convStore.loading">
         <div
           v-for="conv in convStore.filteredConversations"
@@ -187,6 +194,12 @@ function handleContextMenu(key, conv) {
 
         <div v-if="!convStore.loading && convStore.filteredConversations.length === 0" class="empty-list">
           暂无对话
+        </div>
+        <div v-if="convStore.loadingMore" style="text-align:center;padding:12px">
+          <NSpin size="small" />
+        </div>
+        <div v-else-if="!convStore.hasMore && convStore.filteredConversations.length > 0" style="text-align:center;padding:12px;color:#999;font-size:12px">
+          已加载全部
         </div>
       </NSpin>
     </div>
