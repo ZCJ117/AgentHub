@@ -5,9 +5,17 @@ import { NAvatar, NButton, NCode, NTag } from 'naive-ui'
 import PlanCard from './PlanCard.vue'
 import DiffViewCard from './DiffViewCard.vue'
 import ArtifactPreviewCard from './ArtifactPreviewCard.vue'
+import { useArtifactStore } from '@/stores/artifact'
 
 const props = defineProps({
   message: { type: Object, required: true }
+})
+
+const artifactStore = useArtifactStore()
+const previewCardArtifact = computed(() => {
+  const refId = props.message?.artifactRefs?.[0]
+  if (!refId) return null
+  return artifactStore.artifacts.find(a => a.id === refId) || null
 })
 
 const emit = defineEmits([
@@ -100,6 +108,7 @@ const codeContent = computed(() => {
       <ArtifactPreviewCard
         v-else-if="message.messageType === 'preview_card'"
         :message="message"
+        :artifact="previewCardArtifact"
         @preview="emit('previewArtifact', $event)"
         @edit="emit('editArtifact', $event)"
         @deploy="emit('deployArtifact', $event)"
