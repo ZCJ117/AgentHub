@@ -1,9 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
 import { useAgentStore } from '@/stores/agent'
-import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSpin } from 'naive-ui'
+import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSegment, NSpin } from 'naive-ui'
 import AgentSelector from '@/components/agent/AgentSelector.vue'
 
 const router = useRouter()
@@ -15,6 +15,10 @@ const selectorMode = ref('direct')
 
 onMounted(async () => {
   await Promise.all([convStore.loadList(), agentStore.loadAgents()])
+})
+
+watch(() => convStore.filter, () => {
+  convStore.loadList()
 })
 
 function selectConversation(id) {
@@ -101,6 +105,16 @@ function handleContextMenu(key, conv) {
             + 新建群聊
           </NButton>
         </NSpace>
+        <n-segment
+          v-model:value="convStore.filter"
+          :options="[
+            { label: '全部', value: 'all' },
+            { label: '单聊', value: 'direct' },
+            { label: '群聊', value: 'group' }
+          ]"
+          size="small"
+          style="width: 100%"
+        />
         <NInput
           v-model:value="convStore.searchKeyword"
           placeholder="搜索对话..."
@@ -240,7 +254,7 @@ function handleContextMenu(key, conv) {
 }
 
 .conv-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   color: #1D1D1F;
   overflow: hidden;
@@ -249,7 +263,7 @@ function handleContextMenu(key, conv) {
 }
 
 .conv-time {
-  font-size: 11px;
+  font-size: 12px;
   color: #999;
   flex-shrink: 0;
   margin-left: 8px;
@@ -262,7 +276,7 @@ function handleContextMenu(key, conv) {
 }
 
 .conv-preview {
-  font-size: 12px;
+  font-size: 14px;
   color: #999;
   overflow: hidden;
   text-overflow: ellipsis;
