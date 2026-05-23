@@ -22,6 +22,7 @@ export const useChatStore = defineStore('chat', () => {
   const hasMoreHistory = ref(false)
   const nextBeforeId = ref(null)
   const messageReactionsMap = ref(new Map())
+  const pendingReactions = ref(new Set())
 
   let sse = null
 
@@ -82,6 +83,7 @@ export const useChatStore = defineStore('chat', () => {
   async function initConversation(convId) {
     conversationId.value = convId
     messages.value = []
+    messageReactionsMap.value.clear()
 
     if (!convId) return
 
@@ -223,8 +225,13 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function handleReaction(messageId, reactionType) {
+    const key = `${messageId}:${reactionType}`
+    if (pendingReactions.value.has(key)) return
+    pendingReactions.value.add(key)
+
     const list = messageReactionsMap.value.get(messageId) || []
     const item = list.find(r => r.reactionType === reactionType)
+
     try {
       if (item?.hasMyReaction) {
         await removeReaction(messageId, reactionType)
@@ -242,6 +249,8 @@ export const useChatStore = defineStore('chat', () => {
       messageReactionsMap.value.set(messageId, list.filter(r => r.count > 0))
     } catch (err) {
       console.warn('Reaction toggle failed:', err)
+    } finally {
+      pendingReactions.value.delete(key)
     }
   }
 
@@ -261,6 +270,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function clearMessages() {
     messages.value = []
+    messageReactionsMap.value.clear()
     streamError.value = ''
     if (sse) sse.disconnect()
     isStreaming.value = false
@@ -272,6 +282,6 @@ export const useChatStore = defineStore('chat', () => {
     initConversation, loadMoreHistory, sendMessage, stopGeneration,
     handleReaction, handleRegenerate, clearMessages,
     addMessageLocal, updateMessage,
-    messageReactionsMap, loadReactions, getReactions
+    messageReactionsMap, pendingReactions, loadReactions, getReactions
   }
 })
