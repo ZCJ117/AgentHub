@@ -85,7 +85,7 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function sendMessage(text, agentId) {
+  async function sendMessage(text, agentId, options = {}) {
     if (!text.trim() || isStreaming.value) return
 
     streamError.value = ''
@@ -166,7 +166,8 @@ export const useChatStore = defineStore('chat', () => {
     sse.connect((signal) => streamChat({
       agentId,
       message: text,
-      conversationId: conversationId.value || null
+      conversationId: conversationId.value || null,
+      ...options
     }, signal))
   }
 
