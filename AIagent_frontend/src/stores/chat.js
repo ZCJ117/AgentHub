@@ -95,6 +95,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function initConversation(convId) {
     conversationId.value = convId
+    replyTo.value = null
     messages.value = []
     messageReactionsMap.value.clear()
 
@@ -284,6 +285,7 @@ export const useChatStore = defineStore('chat', () => {
   function clearMessages() {
     messages.value = []
     messageReactionsMap.value.clear()
+    replyTo.value = null
     streamError.value = ''
     if (sse) sse.disconnect()
     isStreaming.value = false
