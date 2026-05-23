@@ -164,7 +164,7 @@ async function handleUnpinMessage(messageId) {
         @unpin-message="handleUnpinMessage"
       />
     </div>
-    <DetailPanel />
+    <DetailPanel @unpin-message="handleUnpinMessage" />
   </div>
 </template>
 
