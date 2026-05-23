@@ -13,6 +13,7 @@ import vip.mate.artifact.storage.ArtifactStorageProvider;
 import vip.mate.exception.MateClawException;
 
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -92,10 +93,21 @@ public class ArtifactService {
         String downloadUrl = null;
 
         if (isTextType(contentType)) {
+            if (version.getFilePath() == null) {
+                return ArtifactContentVO.builder()
+                    .content(null)
+                    .contentType(contentType)
+                    .fileName(fileName)
+                    .downloadUrl(null)
+                    .build();
+            }
             try {
-                content = new String(storageProvider.read(version.getFilePath()).readAllBytes());
+                byte[] bytes = storageProvider.read(version.getFilePath()).readAllBytes();
+                content = new String(bytes, StandardCharsets.UTF_8);
             } catch (Exception e) {
                 log.warn("Failed to read artifact content: {}", e.getMessage());
+                throw new MateClawException("err.artifact.read_failed",
+                    "Failed to read artifact content: " + e.getMessage());
             }
         } else {
             downloadUrl = "/api/v1/artifacts/" + artifact.getId() + "/versions/" + version.getId() + "/raw";
@@ -140,6 +152,7 @@ public class ArtifactService {
         if ("image".equalsIgnoreCase(artifactType)) {
             String ext = fileName != null && fileName.contains(".")
                 ? fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase() : "png";
+            if (ext.isEmpty()) ext = "png";
             return "image/" + ext;
         }
         return "application/octet-stream";
@@ -226,9 +239,9 @@ public class ArtifactService {
         String diff;
         try {
             String fromContent = from.getFilePath() != null
-                ? new String(storageProvider.read(from.getFilePath()).readAllBytes()) : "";
+                ? new String(storageProvider.read(from.getFilePath()).readAllBytes(), StandardCharsets.UTF_8) : "";
             String toContent = to.getFilePath() != null
-                ? new String(storageProvider.read(to.getFilePath()).readAllBytes()) : "";
+                ? new String(storageProvider.read(to.getFilePath()).readAllBytes(), StandardCharsets.UTF_8) : "";
             diff = simpleDiff(fromContent, toContent);
         } catch (Exception e) {
             diff = to.getDiffFromPrev() != null ? to.getDiffFromPrev() : "";
