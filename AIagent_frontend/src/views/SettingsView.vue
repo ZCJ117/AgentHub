@@ -17,6 +17,7 @@ const savingProfile = ref(false)
 const savingPassword = ref(false)
 const profileMsg = ref('')
 const passwordMsg = ref('')
+const tokenMsg = ref('')
 
 // --- PAT Token state ---
 const tokens = ref([])
@@ -57,27 +58,29 @@ async function loadTokens() {
 
 async function handleCreateToken() {
   if (!newTokenName.value) return
+  tokenMsg.value = ''
+  createdToken.value = ''
   try {
     const body = { name: newTokenName.value }
     if (newTokenExpiresAt.value) {
       body.expiresAt = new Date(newTokenExpiresAt.value).toISOString()
     }
     createdToken.value = await createToken(body)
-    showCreateToken.value = false
     newTokenName.value = ''
     newTokenExpiresAt.value = null
     await loadTokens()
   } catch (err) {
-    console.warn('Create token failed:', err)
+    tokenMsg.value = err.message || '创建失败'
   }
 }
 
 async function handleRevoke(id) {
+  tokenMsg.value = ''
   try {
     await revokeToken(id)
     await loadTokens()
   } catch (err) {
-    console.warn('Revoke token failed:', err)
+    tokenMsg.value = err.message || '吊销失败'
   }
 }
 
@@ -157,17 +160,17 @@ async function savePassword() {
 
     <NCard title="Personal Access Tokens" class="settings-card">
       <NSpace vertical :size="12">
-        <NButton @click="showCreateToken = true" type="primary" ghost>
+        <NButton @click="showCreateToken = true; createdToken = ''; newTokenName = ''; newTokenExpiresAt = null; tokenMsg = ''" type="primary" ghost>
           + 新建 Token
         </NButton>
         <NDataTable
-          v-if="tokens.length > 0"
+          v-if="tokens.length"
           :columns="tokenColumns"
           :data="tokens"
           :bordered="false"
           size="small"
         />
-        <NEmpty v-if="tokens.length === 0" description="暂无 Token" />
+        <NEmpty v-else description="暂无 Token" />
       </NSpace>
     </NCard>
 
@@ -186,7 +189,9 @@ async function savePassword() {
         :title="'Token 已创建，请保存：' + createdToken"
       />
       <template #action>
-        <NButton @click="handleCreateToken">创建</NButton>
+        <span v-if="tokenMsg" style="color: #FF3B30; font-size: 13px; margin-right: 12px;">{{ tokenMsg }}</span>
+        <NButton v-if="!createdToken" @click="handleCreateToken">创建</NButton>
+        <NButton v-else @click="showCreateToken = false">关闭</NButton>
       </template>
     </NModal>
   </div>
