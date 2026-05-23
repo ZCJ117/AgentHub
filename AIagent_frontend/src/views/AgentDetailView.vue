@@ -1,11 +1,21 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAgentStore } from '@/stores/agent'
-import { NAvatar, NTag, NButton, NInput, NTabs, NTabPane, NSpin, NSpace, NSwitch, NDynamicTags, NSelect, NIcon } from 'naive-ui'
+import { NAvatar, NTag, NButton, NInput, NTabs, NTabPane, NSpin, NSpace, NSwitch, NDynamicTags, NSelect, NIcon, NCheckboxGroup, NCheckbox, NEmpty, NGrid, NGridItem, NStatistic, NText } from 'naive-ui'
 import { updateAgent, deleteAgent } from '@/api/agents'
 import { CameraOutline } from '@vicons/ionicons5'
 import { getToken } from '@/utils/token'
+import { formatTime } from '@/utils/time'
+import {
+  fetchEnabledSkills,
+  fetchAvailableTools,
+  fetchAgentSkills,
+  updateAgentSkills,
+  fetchAgentTools,
+  updateAgentTools,
+  fetchAgentStats
+} from '@/api/agent-bindings'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,11 +35,100 @@ const isPublic = ref(true)
 const capabilityTags = ref([])
 const modelName = ref('')
 
+// ── Skills tab state ──
+const availableSkills = ref([])
+const selectedSkillIds = ref([])
+const loadingSkills = ref(false)
+const savingSkills = ref(false)
+
+// ── Tools tab state ──
+const availableTools = ref([])
+const selectedToolNames = ref([])
+const loadingTools = ref(false)
+const savingTools = ref(false)
+
+// ── Stats tab state ──
+const stats = ref(null)
+const loadingStats = ref(false)
+
 const agentTypes = [
   { label: 'ReAct', value: 'react' },
   { label: 'Plan-Execute', value: 'plan_execute' },
   { label: 'Orchestrator', value: 'orchestrator' }
 ]
+
+async function loadSkillsTab() {
+  if (agentId.value === 'new' || loadingSkills.value) return
+  loadingSkills.value = true
+  try {
+    const [bindings, allSkills] = await Promise.all([
+      fetchAgentSkills(Number(agentId.value)),
+      fetchEnabledSkills()
+    ])
+    availableSkills.value = Array.isArray(allSkills) ? allSkills : (allSkills?.records || [])
+    const boundIds = new Set((bindings || []).map(b => b.skillId))
+    selectedSkillIds.value = availableSkills.value
+      .filter(s => boundIds.has(s.id))
+      .map(s => s.id)
+  } finally {
+    loadingSkills.value = false
+  }
+}
+
+async function saveSkills() {
+  if (agentId.value === 'new') return
+  savingSkills.value = true
+  try {
+    await updateAgentSkills(Number(agentId.value), selectedSkillIds.value)
+  } catch (err) {
+    console.warn('Save skills failed:', err)
+  } finally {
+    savingSkills.value = false
+  }
+}
+
+async function loadToolsTab() {
+  if (agentId.value === 'new' || loadingTools.value) return
+  loadingTools.value = true
+  try {
+    const [bindings, allTools] = await Promise.all([
+      fetchAgentTools(Number(agentId.value)),
+      fetchAvailableTools()
+    ])
+    availableTools.value = Array.isArray(allTools) ? allTools : (allTools?.records || [])
+    const boundNames = new Set((bindings || []).map(b => b.toolName))
+    selectedToolNames.value = availableTools.value
+      .filter(t => boundNames.has(t.name))
+      .map(t => t.name)
+  } finally {
+    loadingTools.value = false
+  }
+}
+
+async function saveTools() {
+  if (agentId.value === 'new') return
+  savingTools.value = true
+  try {
+    await updateAgentTools(Number(agentId.value), selectedToolNames.value)
+  } catch (err) {
+    console.warn('Save tools failed:', err)
+  } finally {
+    savingTools.value = false
+  }
+}
+
+async function loadStatsTab() {
+  if (agentId.value === 'new' || loadingStats.value) return
+  loadingStats.value = true
+  try {
+    stats.value = await fetchAgentStats(Number(agentId.value))
+  } catch (err) {
+    console.warn('Load stats failed:', err)
+    stats.value = null
+  } finally {
+    loadingStats.value = false
+  }
+}
 
 onMounted(async () => {
   if (agentId.value && agentId.value !== 'new') {
@@ -44,7 +143,18 @@ onMounted(async () => {
       capabilityTags.value = detail.capabilityTags || []
       modelName.value = detail.modelName || ''
     }
+    // Lazy-load active tab
+    if (activeTab.value === 'skills') loadSkillsTab()
+    else if (activeTab.value === 'tools') loadToolsTab()
+    else if (activeTab.value === 'stats') loadStatsTab()
   }
+})
+
+// Lazy-load tab content on switch
+watch(activeTab, (tab) => {
+  if (tab === 'skills') loadSkillsTab()
+  else if (tab === 'tools') loadToolsTab()
+  else if (tab === 'stats') loadStatsTab()
 })
 
 async function save() {
