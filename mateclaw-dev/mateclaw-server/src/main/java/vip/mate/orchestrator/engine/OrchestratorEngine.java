@@ -214,7 +214,7 @@ public class OrchestratorEngine {
                         ctx.semaphore.acquire();
                         if (!ctx.cancelled) {
                             executeSingle(a, task, parentConv, parentConvId,
-                                agentNames.getOrDefault(a.getAgentId(), "unknown"), ctx, inDegree);
+                                agentNames.getOrDefault(a.getAgentId(), "unknown"), ctx, inDegree, remaining);
                         }
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
@@ -227,7 +227,7 @@ public class OrchestratorEngine {
 
                         if (ex != null && !ctx.cancelled) {
                             log.error("Assignment {} unexpected error", a.getId(), ex);
-                            handleFailure(a, ctx, inDegree);
+                            handleFailure(a, ctx, inDegree, remaining);
                         }
 
                         for (Long depId : reverseGraph.getOrDefault(a.getId(), List.of())) {
@@ -256,7 +256,8 @@ public class OrchestratorEngine {
             String parentConvId,
             String agentName,
             TaskExecutionContext ctx,
-            Map<Long, Integer> inDegree) {
+            Map<Long, Integer> inDegree,
+            java.util.concurrent.atomic.AtomicInteger remaining) {
 
         a.setStatus("running");
         a.setStartedAt(LocalDateTime.now());
@@ -282,6 +283,7 @@ public class OrchestratorEngine {
                 .block(Duration.ofSeconds(DEFAULT_TIMEOUT_SECONDS + 10));
 
             if (chunks == null) {
+                if (ctx.cancelled) return;
                 a.setStatus("failed");
                 a.setErrorMessage("Timeout after " + DEFAULT_TIMEOUT_SECONDS + "s");
                 a.setCompletedAt(LocalDateTime.now());
@@ -289,7 +291,7 @@ public class OrchestratorEngine {
 
                 eventPublisher.publishDelegationProgress(parentConvId, a.getId(), a.getAgentId(),
                     agentName, "failed", "Timeout");
-                handleFailure(a, ctx, inDegree);
+                handleFailure(a, ctx, inDegree, remaining);
                 return;
             }
 
@@ -298,6 +300,7 @@ public class OrchestratorEngine {
                 ? fullText.substring(0, MAX_RESULT_LENGTH) + "..."
                 : fullText;
 
+            if (ctx.cancelled) return;
             a.setResultSummary(summary);
             a.setStatus("completed");
             a.setCompletedAt(LocalDateTime.now());
@@ -309,6 +312,7 @@ public class OrchestratorEngine {
             incrementTaskCounter(task.getId(), "completedAssignments");
 
         } catch (Exception e) {
+            if (ctx.cancelled) return;
             log.error("Assignment {} failed", a.getId(), e);
             a.setStatus("failed");
             a.setErrorMessage(truncateSummary(e.getMessage(), 500));
@@ -317,14 +321,15 @@ public class OrchestratorEngine {
 
             eventPublisher.publishDelegationProgress(parentConvId, a.getId(), a.getAgentId(),
                 agentName, "failed", truncateSummary(e.getMessage(), 200));
-            handleFailure(a, ctx, inDegree);
+            handleFailure(a, ctx, inDegree, remaining);
         }
     }
 
     private void handleFailure(
             OrchestratorAssignmentEntity a,
             TaskExecutionContext ctx,
-            Map<Long, Integer> inDegree) {
+            Map<Long, Integer> inDegree,
+            java.util.concurrent.atomic.AtomicInteger remaining) {
 
         int retries = a.getRetryCount() != null ? a.getRetryCount() : 0;
         if (retries < MAX_RETRY_COUNT) {
@@ -333,6 +338,7 @@ public class OrchestratorEngine {
             a.setErrorMessage(null);
             assignmentMapper.updateById(a);
             inDegree.put(a.getId(), 0);
+            remaining.incrementAndGet();
             log.info("Assignment {} retry {}/{}", a.getId(), retries + 1, MAX_RETRY_COUNT);
             return;
         }
