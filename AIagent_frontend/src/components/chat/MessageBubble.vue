@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { renderMarkdown } from '@/composables/useMarkdown'
 import { NAvatar, NButton, NCode, NTag, NIcon } from 'naive-ui'
-import { PushpinOutlined, PushpinFilled } from '@vicons/ionicons5'
+import { PinOutline, Pin } from '@vicons/ionicons5'
 import PlanCard from './PlanCard.vue'
 import DiffViewCard from './DiffViewCard.vue'
 import ArtifactPreviewCard from './ArtifactPreviewCard.vue'
@@ -136,7 +136,7 @@ const codeContent = computed(() => {
           @click.stop="emit('pinMessage', message.id)"
           title="钉选消息"
         >
-          <NIcon><PushpinOutlined /></NIcon>
+          <NIcon><PinOutline /></NIcon>
         </NButton>
         <NButton
           v-else
@@ -146,7 +146,7 @@ const codeContent = computed(() => {
           @click.stop="emit('unpinMessage', message.id)"
           title="取消钉选"
         >
-          <NIcon><PushpinFilled /></NIcon>
+          <NIcon><Pin /></NIcon>
         </NButton>
       </div>
 
