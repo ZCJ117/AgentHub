@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useOrchestratorStore } from '@/stores/orchestrator'
 import { NAvatar, NTag, NButton, NCollapse, NCollapseItem, NSpin, NSpace } from 'naive-ui'
@@ -7,7 +7,11 @@ import { NAvatar, NTag, NButton, NCollapse, NCollapseItem, NSpin, NSpace } from 
 const convStore = useConversationStore()
 const orchStore = useOrchestratorStore()
 
+const emit = defineEmits(['unpinMessage'])
+const scrollToMessage = inject('scrollToMessage', null)
+
 const conversation = computed(() => convStore.activeConversation)
+const pinnedMessages = computed(() => convStore.pinnedMessages || [])
 const isGroup = computed(() => conversation.value?.conversationType === 'group')
 const task = computed(() => orchStore.currentTask)
 const assignments = computed(() => orchStore.assignments)
@@ -35,6 +39,27 @@ function statusIcon(status) {
       <div class="info-row">
         <span class="label">消息数</span>
         <span>{{ conversation.messageCount || 0 }}</span>
+      </div>
+    </div>
+
+    <div class="panel-section" v-if="pinnedMessages.length > 0">
+      <h4>钉选消息 ({{ pinnedMessages.length }})</h4>
+      <div
+        v-for="pin in pinnedMessages"
+        :key="pin.id"
+        class="pinned-item"
+        @click="scrollToMessage?.(pin.messageId)"
+      >
+        <p class="pin-note">{{ pin.note || '(无备注)' }}</p>
+        <p class="pin-preview">{{ pin.messagePreview || '' }}</p>
+        <NButton
+          size="tiny"
+          text
+          type="error"
+          @click.stop="emit('unpinMessage', pin.messageId)"
+        >
+          取消
+        </NButton>
       </div>
     </div>
 
@@ -83,7 +108,7 @@ function statusIcon(status) {
 }
 
 .panel-section h4 {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 600;
   color: #999;
   margin-bottom: 10px;
@@ -96,7 +121,7 @@ function statusIcon(status) {
   justify-content: space-between;
   align-items: center;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .info-row .label {
@@ -123,7 +148,7 @@ function statusIcon(status) {
 }
 
 .progress-text {
-  font-size: 12px;
+  font-size: 13px;
   color: #666;
 }
 
@@ -136,7 +161,7 @@ function statusIcon(status) {
   align-items: center;
   gap: 6px;
   padding: 4px 0;
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .assign-agent {
@@ -156,5 +181,35 @@ function statusIcon(status) {
 .empty-hint {
   font-size: 13px;
   color: #999;
+}
+
+.pinned-item {
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  background: #FFFFFF;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.pinned-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.pin-note {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1D1D1F;
+  margin: 0 0 4px 0;
+}
+
+.pin-preview {
+  font-size: 12px;
+  color: #999;
+  margin: 0 0 8px 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
 }
 </style>
