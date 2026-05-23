@@ -55,6 +55,7 @@ function handleSendMessage(text) {
     .map(m => m.agentId)
 
   chatStore.sendMessage(text, agentId, mentionedAgentIds.length > 0 ? { mentionedAgentIds } : undefined)
+  composerPrefillText.value = ''
 }
 
 function handleStopGeneration() {

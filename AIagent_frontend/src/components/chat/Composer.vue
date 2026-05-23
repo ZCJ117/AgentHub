@@ -162,9 +162,11 @@ function handleInterrupt() {
 }
 
 function closeMention() {
-  mentionOpen.value = false
-  mentionStartPos.value = -1
-  mentionQuery.value = ''
+  setTimeout(() => {
+    mentionOpen.value = false
+    mentionStartPos.value = -1
+    mentionQuery.value = ''
+  }, 150)
 }
 </script>
 
