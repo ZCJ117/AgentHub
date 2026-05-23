@@ -94,17 +94,33 @@ function triggerUpload() {
 async function handleAvatarUpload(e) {
   const file = e.target.files[0]
   if (!file) return
-  const formData = new FormData()
-  formData.append('file', file)
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
 
-  const token = getToken()
-  await fetch(`/api/v1/agents/${agentId.value}/avatar`, {
-    method: 'PUT',
-    headers: { 'Authorization': `Bearer ${token}` },
-    body: formData
-  })
-  store.detailCache.delete(Number(agentId.value))
-  await store.loadDetail(Number(agentId.value))
+    const token = getToken()
+    const wsId = localStorage.getItem('ai_agent_workspace_id')
+    const headers = { 'Authorization': `Bearer ${token}` }
+    if (wsId) headers['X-Workspace-Id'] = wsId
+
+    const res = await fetch(`/api/v1/agents/${agentId.value}/avatar`, {
+      method: 'PUT',
+      headers,
+      body: formData
+    })
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}))
+      throw new Error(errData.message || `上传失败 (${res.status})`)
+    }
+
+    store.detailCache.delete(Number(agentId.value))
+    await store.loadDetail(Number(agentId.value))
+  } catch (err) {
+    window.$message?.error?.(err.message || '头像上传失败')
+  } finally {
+    e.target.value = ''
+  }
 }
 </script>
 
@@ -115,7 +131,7 @@ async function handleAvatarUpload(e) {
       <h2>{{ agentId === 'new' ? '新建 Agent' : 'Agent 详情' }}</h2>
     </div>
 
-    <div class="detail-body" v-if="agentId === 'new' || store.detailCache.has(Number(agentId)) || agentId === 'new'">
+    <div class="detail-body" v-if="agentId === 'new' || store.detailCache.has(Number(agentId))">
       <div class="detail-sidebar">
         <div class="avatar-upload" @click="triggerUpload">
           <NAvatar :size="80" round :src="agentDetail.avatarUrl" :fallback="(agentDetail.name || 'AI')[0]" />

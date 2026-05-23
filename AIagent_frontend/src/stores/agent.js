@@ -49,7 +49,7 @@ export const useAgentStore = defineStore('agent', () => {
   }
 
   return {
-    agents, selectedAgentId, isLoading,
+    agents, selectedAgentId, isLoading, detailCache,
     selectedAgent, enabledAgents,
     selectAgent, loadAgents, loadDetail
   }
