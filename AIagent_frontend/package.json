@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@vicons/ionicons5": "^0.13.0",
     "axios": "^1.7.2",
     "dompurify": "^3.4.5",
     "marked": "^18.0.4",
