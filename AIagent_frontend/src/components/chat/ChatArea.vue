@@ -20,7 +20,8 @@ const emit = defineEmits([
   'applyDiff', 'rejectDiff',
   'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact',
   'cancelTask', 'retryTask',
-  'pinMessage', 'unpinMessage'
+  'pinMessage', 'unpinMessage',
+  'reply', 'showReplyChain'
 ])
 
 const messagesContainer = ref(null)
@@ -81,6 +82,8 @@ watch(
         @retry-task="(taskId, ids) => emit('retryTask', taskId, ids)"
         @pin-message="id => emit('pinMessage', id)"
         @unpin-message="id => emit('unpinMessage', id)"
+        @reply="msg => emit('reply', msg)"
+        @show-reply-chain="id => emit('showReplyChain', id)"
       />
     </div>
 
