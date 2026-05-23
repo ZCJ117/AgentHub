@@ -23,6 +23,19 @@ export const useChatStore = defineStore('chat', () => {
   const nextBeforeId = ref(null)
   const messageReactionsMap = ref(new Map())
   const pendingReactions = ref(new Set())
+  const replyTo = ref(null) // { id, preview, senderName } | null
+
+  function setReplyTo(msg) {
+    replyTo.value = {
+      id: msg.id,
+      preview: (msg.content || '').slice(0, 80),
+      senderName: msg.senderAgentName || '你'
+    }
+  }
+
+  function clearReplyTo() {
+    replyTo.value = null
+  }
 
   let sse = null
 
@@ -120,7 +133,7 @@ export const useChatStore = defineStore('chat', () => {
 
     streamError.value = ''
 
-    addMessageLocal('user', text)
+    addMessageLocal('user', text, { replyToId: replyTo.value?.id || null })
 
     const assistantId = addMessageLocal('assistant', '', { status: 'streaming' })
 
@@ -282,6 +295,7 @@ export const useChatStore = defineStore('chat', () => {
     initConversation, loadMoreHistory, sendMessage, stopGeneration,
     handleReaction, handleRegenerate, clearMessages,
     addMessageLocal, updateMessage,
-    messageReactionsMap, pendingReactions, loadReactions, getReactions
+    messageReactionsMap, pendingReactions, loadReactions, getReactions,
+    replyTo, setReplyTo, clearReplyTo
   }
 })

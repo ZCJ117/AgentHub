@@ -2,6 +2,7 @@
 import { ref, watch, computed, nextTick } from 'vue'
 import { NButton, NPopover, NList, NListItem, NAvatar } from 'naive-ui'
 import { useConversationStore } from '@/stores/conversation'
+import { useChatStore } from '@/stores/chat'
 import { useTextareaAutosize } from '@/composables/useTextareaAutosize'
 
 const props = defineProps({
@@ -14,6 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['send', 'stop', 'interrupt'])
 
 const convStore = useConversationStore()
+const chatStore = useChatStore()
 const text = ref('')
 const { textarea, onInput: autosizeOnInput } = useTextareaAutosize()
 
@@ -154,6 +156,7 @@ function handleSend() {
   const val = text.value.trim()
   if (!val || props.disabled) return
   emit('send', val)
+  chatStore.clearReplyTo()
   text.value = ''
 }
 
@@ -173,6 +176,10 @@ function closeMention() {
 <template>
   <div class="composer">
     <div class="composer-inner">
+      <div v-if="chatStore.replyTo" class="reply-indicator">
+        <span class="reply-indicator-text">正在回复 <strong>{{ chatStore.replyTo.senderName }}</strong>：{{ chatStore.replyTo.preview }}</span>
+        <NButton text size="tiny" @click="chatStore.clearReplyTo()">✕ 取消</NButton>
+      </div>
       <NPopover
         :show="mentionOpen"
         trigger="manual"
@@ -263,6 +270,30 @@ function closeMention() {
   align-items: flex-end;
   max-width: 900px;
   margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.reply-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  margin-bottom: 8px;
+  background: rgba(46, 117, 182, 0.06);
+  border-left: 3px solid #2E75B6;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #555;
+  width: 100%;
+}
+
+.reply-indicator-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
 }
 
 .composer-input {
