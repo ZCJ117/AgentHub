@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { renderMarkdown } from '@/composables/useMarkdown'
 import { NAvatar, NButton, NCode, NTag, NIcon, NImage } from 'naive-ui'
 import { PinOutline, Pin } from '@vicons/ionicons5'
@@ -65,8 +65,21 @@ const codeContent = computed(() => {
   return content
 })
 
+function handleDownload(url) {
+  if (!url) return
+  const trimmed = String(url).trim()
+  if (/^(javascript|data):/i.test(trimmed)) return
+  window.open(trimmed, '_blank', 'noopener')
+}
+
 onMounted(() => {
   if (props.message.id && !isUser.value && !isStreaming.value) {
+    chatStore.loadReactions(props.message.id)
+  }
+})
+
+watch(isStreaming, (newVal, oldVal) => {
+  if (oldVal === true && newVal === false && props.message.id && !isUser.value) {
     chatStore.loadReactions(props.message.id)
   }
 })
@@ -112,7 +125,7 @@ onMounted(() => {
 
       <div v-else-if="message.messageType === 'file'" class="msg-file">
         <span>📎 {{ message.content }}</span>
-        <NButton size="tiny" quaternary @click="window.open(message.content, '_blank', 'noopener')">下载</NButton>
+        <NButton size="tiny" quaternary @click="handleDownload(message.content)">下载</NButton>
       </div>
 
       <DiffViewCard
@@ -260,10 +273,8 @@ onMounted(() => {
   overflow: hidden;
 }
 
-.msg-image img {
-  max-width: 320px;
-  border-radius: 14px;
-  cursor: pointer;
+.msg-image {
+  /* NImage handles preview internally */
 }
 
 .msg-status {
