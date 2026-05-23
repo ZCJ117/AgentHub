@@ -4,7 +4,6 @@ import {
   fetchArtifacts,
   fetchArtifactDetail,
   fetchArtifactVersions,
-  fetchVersionDetail,
   fetchArtifactContent,
   fetchVersionContent,
   fetchVersionDiff,
