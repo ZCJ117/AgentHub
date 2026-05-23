@@ -30,5 +30,20 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
-  return { workspaces, activeId, activeWorkspace, loadAndSelect }
+  async function selectWorkspace(id) {
+    activeId.value = id
+    localStorage.setItem('ai_agent_workspace_id', String(id))
+
+    const { useConversationStore } = await import('@/stores/conversation')
+    const { useAgentStore } = await import('@/stores/agent')
+    const { useArtifactStore } = await import('@/stores/artifact')
+    const { useOrchestratorStore } = await import('@/stores/orchestrator')
+
+    useConversationStore().loadList()
+    useAgentStore().loadAgents({ enabled: true })
+    useArtifactStore().loadList()
+    useOrchestratorStore().reset()
+  }
+
+  return { workspaces, activeId, activeWorkspace, loadAndSelect, selectWorkspace }
 })
