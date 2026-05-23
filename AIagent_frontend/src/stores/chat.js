@@ -5,6 +5,7 @@ import { fetchMessages } from '@/api/conversations'
 import { addReaction, regenerateMessage } from '@/api/messages'
 import { useSSE } from '@/composables/useSSE'
 import { useOrchestratorStore } from '@/stores/orchestrator'
+import { useArtifactStore } from '@/stores/artifact'
 
 let msgIdCounter = 0
 function nextLocalId() {
@@ -142,8 +143,21 @@ export const useChatStore = defineStore('chat', () => {
     })
 
     sse.on('artifact_preview', (data) => {
-      // Phase 3 — artifact store integration point
-      console.log('Artifact preview:', data)
+      const artifactStore = useArtifactStore()
+      if (data.artifactId) {
+        artifactStore.handleArtifactPreview({
+          artifactId: data.artifactId,
+          artifactType: data.type || 'html',
+          artifactName: data.name || 'New Artifact',
+          conversationId: conversationId.value,
+          previewUrl: data.previewUrl
+        })
+      }
+      addMessageLocal('assistant', data.previewUrl || '', {
+        messageType: 'preview_card',
+        artifactRefs: [data.artifactId],
+        status: 'completed'
+      })
     })
 
     sse.on('done', (data) => {
