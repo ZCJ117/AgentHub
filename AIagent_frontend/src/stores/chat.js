@@ -152,12 +152,12 @@ export const useChatStore = defineStore('chat', () => {
           conversationId: conversationId.value,
           previewUrl: data.previewUrl
         })
+        addMessageLocal('assistant', data.previewUrl || '', {
+          messageType: 'preview_card',
+          artifactRefs: [data.artifactId],
+          status: 'completed'
+        })
       }
-      addMessageLocal('assistant', data.previewUrl || '', {
-        messageType: 'preview_card',
-        artifactRefs: [data.artifactId],
-        status: 'completed'
-      })
     })
 
     sse.on('done', (data) => {
