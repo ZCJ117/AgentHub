@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, h } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
-import { NInput, NButton, NSpace, NCard } from 'naive-ui'
+import { NInput, NButton, NSpace, NCard, NModal, NForm, NFormItem, NDatePicker, NAlert, NPopconfirm, NDataTable, NEmpty } from 'naive-ui'
 import { updateProfile, changePassword } from '@/api/auth'
+import { fetchTokens, createToken, revokeToken } from '@/api/tokens'
 
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
@@ -17,10 +18,68 @@ const savingPassword = ref(false)
 const profileMsg = ref('')
 const passwordMsg = ref('')
 
+// --- PAT Token state ---
+const tokens = ref([])
+const showCreateToken = ref(false)
+const createdToken = ref('')
+const newTokenName = ref('')
+const newTokenExpiresAt = ref(null)
+
+const tokenColumns = [
+  { title: '名称', key: 'name' },
+  { title: '创建时间', key: 'createdAt' },
+  { title: '过期时间', key: 'expiresAt' },
+  {
+    title: '操作',
+    key: 'actions',
+    render(row) {
+      return h(NPopconfirm, {
+        onPositiveClick: () => handleRevoke(row.id)
+      }, {
+        trigger: () => h(NButton, { size: 'tiny', type: 'error', text: true }, { default: () => '吊销' }),
+        default: () => '确定吊销此 Token？'
+      })
+    }
+  }
+]
+
 onMounted(async () => {
   await authStore.refreshProfile()
   nickname.value = authStore.nickname || ''
+  loadTokens()
 })
+
+async function loadTokens() {
+  try {
+    tokens.value = await fetchTokens()
+  } catch { tokens.value = [] }
+}
+
+async function handleCreateToken() {
+  if (!newTokenName.value) return
+  try {
+    const body = { name: newTokenName.value }
+    if (newTokenExpiresAt.value) {
+      body.expiresAt = new Date(newTokenExpiresAt.value).toISOString()
+    }
+    createdToken.value = await createToken(body)
+    showCreateToken.value = false
+    newTokenName.value = ''
+    newTokenExpiresAt.value = null
+    await loadTokens()
+  } catch (err) {
+    console.warn('Create token failed:', err)
+  }
+}
+
+async function handleRevoke(id) {
+  try {
+    await revokeToken(id)
+    await loadTokens()
+  } catch (err) {
+    console.warn('Revoke token failed:', err)
+  }
+}
 
 async function saveProfile() {
   savingProfile.value = true
@@ -95,6 +154,41 @@ async function savePassword() {
     <NCard title="关于" class="settings-card">
       <p>AgentHub 多 Agent 协同工作平台 v1.0</p>
     </NCard>
+
+    <NCard title="Personal Access Tokens" class="settings-card">
+      <NSpace vertical :size="12">
+        <NButton @click="showCreateToken = true" type="primary" ghost>
+          + 新建 Token
+        </NButton>
+        <NDataTable
+          v-if="tokens.length > 0"
+          :columns="tokenColumns"
+          :data="tokens"
+          :bordered="false"
+          size="small"
+        />
+        <NEmpty v-if="tokens.length === 0" description="暂无 Token" />
+      </NSpace>
+    </NCard>
+
+    <NModal v-model:show="showCreateToken" title="新建 Access Token">
+      <NForm>
+        <NFormItem label="名称">
+          <NInput v-model:value="newTokenName" placeholder="如 CLI Access" />
+        </NFormItem>
+        <NFormItem label="过期时间（可选）">
+          <NDatePicker v-model:value="newTokenExpiresAt" type="datetime" />
+        </NFormItem>
+      </NForm>
+      <NAlert
+        v-if="createdToken"
+        type="success"
+        :title="'Token 已创建，请保存：' + createdToken"
+      />
+      <template #action>
+        <NButton @click="handleCreateToken">创建</NButton>
+      </template>
+    </NModal>
   </div>
 </template>
 
