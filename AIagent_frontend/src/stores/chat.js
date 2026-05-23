@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { streamChat, stopChat, interruptChat } from '@/api/chat'
 import { fetchMessages } from '@/api/conversations'
-import { addReaction, regenerateMessage } from '@/api/messages'
+import { addReaction, removeReaction, fetchReactions, regenerateMessage } from '@/api/messages'
+import { useAuthStore } from '@/stores/auth'
 import { useSSE } from '@/composables/useSSE'
 import { useOrchestratorStore } from '@/stores/orchestrator'
 import { useArtifactStore } from '@/stores/artifact'
@@ -20,6 +21,7 @@ export const useChatStore = defineStore('chat', () => {
   const currentTurnId = ref(null)
   const hasMoreHistory = ref(false)
   const nextBeforeId = ref(null)
+  const messageReactionsMap = ref(new Map())
 
   let sse = null
 
@@ -50,6 +52,31 @@ export const useChatStore = defineStore('chat', () => {
     if (idx !== -1) {
       messages.value[idx] = { ...messages.value[idx], ...updates }
     }
+  }
+
+  async function loadReactions(messageId) {
+    try {
+      const data = await fetchReactions(messageId)
+      const authStore = useAuthStore()
+      const myId = authStore.userId
+      const list = []
+      if (data && typeof data === 'object') {
+        for (const [type, users] of Object.entries(data)) {
+          const count = Array.isArray(users) ? users.length : 0
+          const hasMyReaction = Array.isArray(users)
+            ? users.some(u => (u.userId || u.id) === myId)
+            : false
+          if (count > 0) list.push({ reactionType: type, count, hasMyReaction })
+        }
+      }
+      messageReactionsMap.value.set(messageId, list)
+    } catch (err) {
+      console.warn('Failed to load reactions:', err)
+    }
+  }
+
+  function getReactions(messageId) {
+    return messageReactionsMap.value.get(messageId) || []
   }
 
   async function initConversation(convId) {
@@ -196,13 +223,25 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function handleReaction(messageId, reactionType) {
-    const msg = messages.value.find(m => m.id === messageId)
-    if (!msg || msg.role !== 'assistant') return
-
+    const list = messageReactionsMap.value.get(messageId) || []
+    const item = list.find(r => r.reactionType === reactionType)
     try {
-      await addReaction(messageId, reactionType)
+      if (item?.hasMyReaction) {
+        await removeReaction(messageId, reactionType)
+        item.count = Math.max(0, item.count - 1)
+        item.hasMyReaction = false
+      } else {
+        await addReaction(messageId, reactionType)
+        if (item) {
+          item.count += 1
+          item.hasMyReaction = true
+        } else {
+          list.push({ reactionType, count: 1, hasMyReaction: true })
+        }
+      }
+      messageReactionsMap.value.set(messageId, list.filter(r => r.count > 0))
     } catch (err) {
-      console.warn('Reaction failed:', err)
+      console.warn('Reaction toggle failed:', err)
     }
   }
 
@@ -232,6 +271,7 @@ export const useChatStore = defineStore('chat', () => {
     currentTurnId, hasMoreHistory, isEmpty,
     initConversation, loadMoreHistory, sendMessage, stopGeneration,
     handleReaction, handleRegenerate, clearMessages,
-    addMessageLocal, updateMessage
+    addMessageLocal, updateMessage,
+    messageReactionsMap, loadReactions, getReactions
   }
 })
