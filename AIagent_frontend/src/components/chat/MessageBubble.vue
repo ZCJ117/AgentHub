@@ -93,8 +93,8 @@ const codeContent = computed(() => {
       <PlanCard
         v-else-if="message.messageType === 'plan_card'"
         :message="message"
-        @cancel="emit('cancelTask')"
-        @retry="emit('retryTask')"
+        @cancel="emit('cancelTask', message.props?.taskId)"
+        @retry="emit('retryTask', message.props?.taskId, message.props?.failedAssignmentIds || [])"
       />
 
       <ArtifactPreviewCard
@@ -157,7 +157,7 @@ const codeContent = computed(() => {
 }
 
 .msg-agent-name {
-  font-size: 12px;
+  font-size: 14px;
   color: #666;
   margin-bottom: 4px;
 }
@@ -166,7 +166,7 @@ const codeContent = computed(() => {
   background: #FFFFFF;
   border-radius: 14px;
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.6;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   word-break: break-word;
@@ -197,7 +197,7 @@ const codeContent = computed(() => {
 }
 
 .msg-status {
-  font-size: 12px;
+  font-size: 13px;
   margin-top: 4px;
 }
 
@@ -222,7 +222,7 @@ const codeContent = computed(() => {
 }
 
 .msg-tokens {
-  font-size: 11px;
+  font-size: 12px;
   color: #999;
   margin-top: 2px;
 }
