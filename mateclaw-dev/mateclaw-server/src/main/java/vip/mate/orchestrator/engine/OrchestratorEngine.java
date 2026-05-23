@@ -64,7 +64,7 @@ public class OrchestratorEngine {
                     .orderByAsc(OrchestratorAssignmentEntity::getStepOrder));
 
             if (assignments.isEmpty()) {
-                completeTask(task, ctx, "{}", 0, 0);
+                completeTask(task, "{}", 0, 0);
                 return;
             }
 
@@ -115,10 +115,6 @@ public class OrchestratorEngine {
             Object scheduleLock = new Object();
             java.util.concurrent.atomic.AtomicInteger remaining =
                 new java.util.concurrent.atomic.AtomicInteger(assignments.size());
-            java.util.concurrent.atomic.AtomicInteger completed =
-                new java.util.concurrent.atomic.AtomicInteger(0);
-            java.util.concurrent.atomic.AtomicInteger failed =
-                new java.util.concurrent.atomic.AtomicInteger(0);
 
             Map<Long, String> agentNames = new HashMap<>();
             for (OrchestratorAssignmentEntity a : assignments) {
@@ -129,7 +125,7 @@ public class OrchestratorEngine {
             }
 
             scheduleReady(assignments, inDegree, reverseGraph, ctx, task, parentConv,
-                parentConvId, agentNames, scheduleLock, remaining, completed, failed);
+                parentConvId, agentNames, scheduleLock, remaining);
 
             synchronized (scheduleLock) {
                 while (remaining.get() > 0 && !ctx.cancelled) {
@@ -150,7 +146,9 @@ public class OrchestratorEngine {
                     .orderByAsc(OrchestratorAssignmentEntity::getStepOrder));
 
             String aggregated = aggregateResults(assignments);
-            completeTask(task, ctx, aggregated, completed.get(), failed.get());
+            int finalCompleted = (int) assignments.stream().filter(a -> "completed".equals(a.getStatus())).count();
+            int finalFailed = (int) assignments.stream().filter(a -> "failed".equals(a.getStatus())).count();
+            completeTask(task, aggregated, finalCompleted, finalFailed);
 
         } catch (Exception e) {
             log.error("Orchestrator task {} execution failed", task.getId(), e);
@@ -200,9 +198,7 @@ public class OrchestratorEngine {
             String parentConvId,
             Map<Long, String> agentNames,
             Object scheduleLock,
-            java.util.concurrent.atomic.AtomicInteger remaining,
-            java.util.concurrent.atomic.AtomicInteger completed,
-            java.util.concurrent.atomic.AtomicInteger failed) {
+            java.util.concurrent.atomic.AtomicInteger remaining) {
 
         synchronized (scheduleLock) {
             if (ctx.cancelled) return;
@@ -231,7 +227,7 @@ public class OrchestratorEngine {
 
                         if (ex != null && !ctx.cancelled) {
                             log.error("Assignment {} unexpected error", a.getId(), ex);
-                            handleFailure(a, ctx, completed, failed, inDegree);
+                            handleFailure(a, ctx, inDegree);
                         }
 
                         for (Long depId : reverseGraph.getOrDefault(a.getId(), List.of())) {
@@ -241,7 +237,7 @@ public class OrchestratorEngine {
                         remaining.decrementAndGet();
                         scheduleReady(assignments, inDegree, reverseGraph, ctx, task,
                             parentConv, parentConvId, agentNames, scheduleLock,
-                            remaining, completed, failed);
+                            remaining);
                         scheduleLock.notifyAll();
                     }
                 });
@@ -293,7 +289,7 @@ public class OrchestratorEngine {
 
                 eventPublisher.publishDelegationProgress(parentConvId, a.getId(), a.getAgentId(),
                     agentName, "failed", "Timeout");
-                handleFailure(a, ctx, null, null, inDegree);
+                handleFailure(a, ctx, inDegree);
                 return;
             }
 
@@ -321,15 +317,13 @@ public class OrchestratorEngine {
 
             eventPublisher.publishDelegationProgress(parentConvId, a.getId(), a.getAgentId(),
                 agentName, "failed", truncateSummary(e.getMessage(), 200));
-            handleFailure(a, ctx, null, null, inDegree);
+            handleFailure(a, ctx, inDegree);
         }
     }
 
     private void handleFailure(
             OrchestratorAssignmentEntity a,
             TaskExecutionContext ctx,
-            java.util.concurrent.atomic.AtomicInteger completed,
-            java.util.concurrent.atomic.AtomicInteger failed,
             Map<Long, Integer> inDegree) {
 
         int retries = a.getRetryCount() != null ? a.getRetryCount() : 0;
@@ -344,7 +338,6 @@ public class OrchestratorEngine {
         }
 
         incrementTaskCounter(a.getTaskId(), "failedAssignments");
-        if (failed != null) failed.incrementAndGet();
 
         if ("fail_fast".equals(ctx.failurePolicy)) {
             ctx.cancelled = true;
@@ -356,7 +349,7 @@ public class OrchestratorEngine {
 
     // ─── Task Completion ──────────────────────────────────────────
 
-    private void completeTask(OrchestratorTaskEntity task, TaskExecutionContext ctx,
+    private void completeTask(OrchestratorTaskEntity task,
                                String aggregated, int completed, int failed) {
         ConversationEntity parentConv = conversationMapper.selectById(task.getConversationId());
         String parentConvId = parentConv != null ? parentConv.getConversationId() : "";
