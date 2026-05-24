@@ -146,12 +146,8 @@ public class AgentBridgeManager {
         try {
             String json = protocol.encode(frame);
             TextMessage msg = new TextMessage(json);
-            CompletableFuture<Void> future = new CompletableFuture<>();
-            session.getWsSession().sendMessage(msg)
-                    .addCallback(
-                            unused -> future.complete(null),
-                            future::completeExceptionally);
-            return future;
+            session.getWsSession().sendMessage(msg);
+            return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
             return CompletableFuture.failedFuture(e);
         }
