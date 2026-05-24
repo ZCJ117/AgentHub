@@ -177,81 +177,82 @@ public class AgentGraphBuilder {
         Set<String> boundTools = agentBindingService.getEffectiveToolNames(entity.getId());
         toolSet = toolSet.withAllowedToolsOnly(boundTools); // null = 全局默认
 
-        // Resolve the base model with the precedence: per-conversation pin >
-        // per-Agent model override > global default. resolveRuntimeBaseModel
-        // looks up enabled-only models and silently degrades an unmatched pin /
-        // override to the global default, preserving the legacy behaviour for
-        // Agents and conversations without an explicit choice.
-        // providerRouter.selectPrimary below may still swap this for a model
-        // that satisfies a bound skill's requires-model constraint.
-        ModelConfigEntity globalDefault;
-        try {
-            globalDefault = resolveRuntimeBaseModel(modelProvider, modelName, entity.getModelName());
-        } catch (Exception e) {
-            throw new MateClawException("err.agent.no_default_model", "无法构建 Agent：请先在「设置 → 模型」中配置并启用默认模型");
-        }
-        ModelConfigEntity runtimeModel;
-        try {
-            runtimeModel = providerRouter.selectPrimary(entity.getId(), globalDefault);
-            if (runtimeModel == null) runtimeModel = globalDefault;
-        } catch (Exception e) {
-            log.debug("[ProviderRouter] primary selection failed, falling back to global default: {}",
-                    e.getMessage());
-            runtimeModel = globalDefault;
-        }
-        // Even after the upgrade, log a WARN when the chosen primary
-        // still doesn't satisfy needs (e.g. no preferred provider was
-        // capable). The diagnostic is observability-only.
-        try {
-            providerRouter.diagnosePrimary(entity.getId(), runtimeModel);
-        } catch (Exception e) {
-            log.debug("[ProviderRouter] diagnostic failed: {}", e.getMessage());
-        }
+        // For local_cli agents, skip model resolution entirely — they run on
+        // the user's machine and don't need a platform-side LLM.
+        final boolean isLocalCli = "local_cli".equals(entity.getAgentType());
 
-        ModelProviderEntity provider;
-        try {
-            provider = modelProviderService.getProviderConfig(runtimeModel.getProvider());
-        } catch (Exception e) {
-            throw new MateClawException("err.agent.model_not_configured", "模型 " + runtimeModel.getModelName()
-                    + " 的 Provider（" + runtimeModel.getProvider() + "）未配置，请检查模型设置");
-        }
+        ModelConfigEntity runtimeModel = null;
+        ModelProviderEntity provider = null;
+        ModelProtocol protocol = null;
+        boolean builtinSearchEnabled = false;
 
-        // Safety net: getDefaultModel() already skips unconfigured providers, but guard here
-        // too so a stale cached model doesn't silently proceed to a broken API call.
-        if (!modelProviderService.isProviderConfigured(provider.getProviderId())) {
-            String reason = modelProviderService.getProviderUnavailableReason(provider.getProviderId());
-            log.warn("Runtime model {}/{} provider not configured ({}); trying fallback",
-                    runtimeModel.getProvider(), runtimeModel.getModelName(), reason);
-            ModelConfigEntity fallback = findFirstAvailableChatModel();
-            if (fallback == null) {
-                throw new MateClawException("err.agent.no_configured_model",
-                        "默认模型 Provider「" + runtimeModel.getProvider() + "」未配置（" + reason
-                        + "），且找不到其他已配置的 Provider，请先在「设置 → 模型」中完成配置");
+        if (!isLocalCli) {
+            ModelConfigEntity globalDefault;
+            try {
+                globalDefault = resolveRuntimeBaseModel(modelProvider, modelName, entity.getModelName());
+            } catch (Exception e) {
+                throw new MateClawException("err.agent.no_default_model", "无法构建 Agent：请先在「设置 → 模型」中配置并启用默认模型");
             }
-            runtimeModel = fallback;
+            try {
+                runtimeModel = providerRouter.selectPrimary(entity.getId(), globalDefault);
+                if (runtimeModel == null) runtimeModel = globalDefault;
+            } catch (Exception e) {
+                log.debug("[ProviderRouter] primary selection failed, falling back to global default: {}",
+                        e.getMessage());
+                runtimeModel = globalDefault;
+            }
+            // Even after the upgrade, log a WARN when the chosen primary
+            // still doesn't satisfy needs (e.g. no preferred provider was
+            // capable). The diagnostic is observability-only.
+            try {
+                providerRouter.diagnosePrimary(entity.getId(), runtimeModel);
+            } catch (Exception e) {
+                log.debug("[ProviderRouter] diagnostic failed: {}", e.getMessage());
+            }
+
             try {
                 provider = modelProviderService.getProviderConfig(runtimeModel.getProvider());
             } catch (Exception e) {
-                throw new MateClawException("err.agent.model_not_configured", "备用模型 " + runtimeModel.getModelName()
-                        + " 的 Provider（" + runtimeModel.getProvider() + "）获取失败");
+                throw new MateClawException("err.agent.model_not_configured", "模型 " + runtimeModel.getModelName()
+                        + " 的 Provider（" + runtimeModel.getProvider() + "）未配置，请检查模型设置");
             }
-        }
 
-        ModelProtocol protocol = ModelProtocol.fromChatModel(provider.getChatModel());
+            // Safety net: getDefaultModel() already skips unconfigured providers, but guard here
+            // too so a stale cached model doesn't silently proceed to a broken API call.
+            if (!modelProviderService.isProviderConfigured(provider.getProviderId())) {
+                String reason = modelProviderService.getProviderUnavailableReason(provider.getProviderId());
+                log.warn("Runtime model {}/{} provider not configured ({}); trying fallback",
+                        runtimeModel.getProvider(), runtimeModel.getModelName(), reason);
+                ModelConfigEntity fallback = findFirstAvailableChatModel();
+                if (fallback == null) {
+                    throw new MateClawException("err.agent.no_configured_model",
+                            "默认模型 Provider「" + runtimeModel.getProvider() + "」未配置（" + reason
+                            + "），且找不到其他已配置的 Provider，请先在「设置 → 模型」中完成配置");
+                }
+                runtimeModel = fallback;
+                try {
+                    provider = modelProviderService.getProviderConfig(runtimeModel.getProvider());
+                } catch (Exception e) {
+                    throw new MateClawException("err.agent.model_not_configured", "备用模型 " + runtimeModel.getModelName()
+                            + " 的 Provider（" + runtimeModel.getProvider() + "）获取失败");
+                }
+            }
 
-        // 内置搜索检测（DashScope / Kimi），但不再移除 WebSearchTool — 两者协同而非互斥
-        boolean builtinSearchEnabled = false;
-        Map<String, Object> providerKwargs = modelProviderService.readProviderGenerateKwargs(provider);
-        if (protocol == ModelProtocol.DASHSCOPE_NATIVE) {
-            builtinSearchEnabled = dashScopeBuilder.isBuiltinSearchEnabled(runtimeModel, provider);
-        } else if (OpenAiCompatibleChatModelBuilder.isKimiProvider(provider)
-                && Boolean.TRUE.equals(providerKwargs.get("enableSearch"))) {
-            builtinSearchEnabled = true;
-        }
-        if (builtinSearchEnabled) {
-            // Phase 2: 不再移除 search 工具，改为在 prompt 中设定优先级引导
-            // 内置搜索作为首选，search 工具作为补充/兜底
-            log.info("内置搜索已开启 (provider={})，search 工具保留作为补充通道", provider.getProviderId());
+            protocol = ModelProtocol.fromChatModel(provider.getChatModel());
+
+            // 内置搜索检测（DashScope / Kimi），但不再移除 WebSearchTool — 两者协同而非互斥
+            Map<String, Object> providerKwargs = modelProviderService.readProviderGenerateKwargs(provider);
+            if (protocol == ModelProtocol.DASHSCOPE_NATIVE) {
+                builtinSearchEnabled = dashScopeBuilder.isBuiltinSearchEnabled(runtimeModel, provider);
+            } else if (OpenAiCompatibleChatModelBuilder.isKimiProvider(provider)
+                    && Boolean.TRUE.equals(providerKwargs.get("enableSearch"))) {
+                builtinSearchEnabled = true;
+            }
+            if (builtinSearchEnabled) {
+                // Phase 2: 不再移除 search 工具，改为在 prompt 中设定优先级引导
+                // 内置搜索作为首选，search 工具作为补充/兜底
+                log.info("内置搜索已开启 (provider={})，search 工具保留作为补充通道", provider.getProviderId());
+            }
         }
         // Default 100 if DB row leaves max_iterations null. Negative or zero is an
         // explicit opt-in to "no soft cap" — ObservationDispatcher already treats
@@ -273,11 +274,16 @@ public class AgentGraphBuilder {
             }
         }
 
-        String enhancedPrompt = buildEnhancedPrompt(entity, builtinSearchEnabled,
-                boundTools, runtimeModel.getMaxInputTokens());
+        String enhancedPrompt;
+        if (isLocalCli) {
+            enhancedPrompt = entity.getSystemPrompt() != null ? entity.getSystemPrompt() : "";
+        } else {
+            enhancedPrompt = buildEnhancedPrompt(entity, builtinSearchEnabled,
+                    boundTools, runtimeModel.getMaxInputTokens());
+        }
 
         // 当前仅支持 DashScope 和 OpenAI-compatible，其他协议直接拒绝
-        if (!"local_cli".equals(entity.getAgentType())) {
+        if (!isLocalCli) {
             if (!supportsStateGraph(protocol)) {
                 throw new MateClawException("err.agent.protocol_not_supported",
                         "当前不支持协议 " + protocol.getId()
@@ -287,10 +293,9 @@ public class AgentGraphBuilder {
 
         BaseAgent agent;
         boolean toolCallingEnabled;
-        if ("local_cli".equals(entity.getAgentType())) {
-            // Local CLI agent — no LLM model needed, bridged over WebSocket
+        if (isLocalCli) {
             agent = buildBridgedAgent(entity);
-            toolCallingEnabled = true;  // local CLI handles tools itself
+            toolCallingEnabled = true;
             log.info("Built BridgedAgent: {} (local_cli)", entity.getName());
         } else if ("plan_execute".equals(entity.getAgentType())) {
             agent = buildPlanExecuteAgent(toolSet, runtimeModel, maxIter, entity.getId());
@@ -311,7 +316,7 @@ public class AgentGraphBuilder {
         agent.systemPrompt = enhancedPrompt;
         agent.maxIterations = maxIter;
 
-        if (!"local_cli".equals(entity.getAgentType())) {
+        if (!isLocalCli) {
             agent.modelName = runtimeModel.getModelName();
             agent.modelCapabilities = modelCapabilityService.resolve(
                     runtimeModel.getModelName(), runtimeModel.getModalities());
@@ -343,7 +348,8 @@ public class AgentGraphBuilder {
         }
 
         log.info("Built agent instance: {} (type={}, protocol={}, tools={}, toolCallingEnabled={})",
-                entity.getName(), entity.getAgentType(), protocol.getId(),
+                entity.getName(), entity.getAgentType(),
+                isLocalCli ? "N/A" : protocol.getId(),
                 toolSet.size(), agent.toolCallingEnabled);
         return agent;
     }

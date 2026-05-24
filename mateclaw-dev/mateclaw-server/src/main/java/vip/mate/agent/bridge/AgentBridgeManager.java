@@ -14,6 +14,7 @@ import vip.mate.agent.bridge.model.BridgeSession;
 import vip.mate.agent.model.AgentEntity;
 import vip.mate.agent.repository.AgentMapper;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +31,7 @@ public class AgentBridgeManager {
 
     private final AgentMapper agentMapper;
     private final AgentBridgeProtocol protocol;
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     /** sessionId → BridgeSession */
     private final ConcurrentHashMap<String, BridgeSession> sessions = new ConcurrentHashMap<>();
@@ -80,7 +82,7 @@ public class AgentBridgeManager {
             // Update status and possibly capability tags
             entity.setAgentStatus("AVAILABLE");
             if (capabilityTags != null && entity.getCapabilityTags() == null) {
-                entity.setCapabilityTags(capabilityTags.toString());
+                entity.setCapabilityTags(toJson(capabilityTags));
             }
             agentMapper.updateById(entity);
             session.setAgentId(String.valueOf(entity.getId()));
@@ -95,7 +97,7 @@ public class AgentBridgeManager {
             newEntity.setWorkspaceId(session.getWorkspaceId());
             newEntity.setCreatorUserId(session.getUserId());
             newEntity.setDescription("Local CLI agent: " + agentName);
-            newEntity.setCapabilityTags(capabilityTags != null ? capabilityTags.toString() : "[]");
+            newEntity.setCapabilityTags(capabilityTags != null ? toJson(capabilityTags) : "[]");
             newEntity.setDeleted(0);
             agentMapper.insert(newEntity);
             session.setAgentId(String.valueOf(newEntity.getId()));
@@ -278,6 +280,14 @@ public class AgentBridgeManager {
     /** Used by the WS handler for protocol validation. */
     public BridgeSession getSession(String sessionId) {
         return sessions.get(sessionId);
+    }
+
+    private static String toJson(Object obj) {
+        try {
+            return obj == null ? "[]" : OBJECT_MAPPER.writeValueAsString(obj);
+        } catch (Exception e) {
+            return "[]";
+        }
     }
 
     private BridgeFrame errorFrame(String message) {
