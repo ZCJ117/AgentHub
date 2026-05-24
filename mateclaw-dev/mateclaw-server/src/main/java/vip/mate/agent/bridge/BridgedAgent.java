@@ -128,7 +128,14 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
                     "conversationId", conversationId,
                     "systemPrompt", systemPrompt != null ? systemPrompt : ""));
 
-            processManager.sendFrame(agentId, request);
+            try {
+                processManager.sendFrame(agentId, request);
+            } catch (Exception e) {
+                log.error("[BridgedAgent] Failed to send chat_request to agent={}: {}",
+                        agentId, e.getMessage());
+                processManager.terminate(agentId);
+                sink.error(e);
+            }
 
         }, FluxSink.OverflowStrategy.LATEST);
     }
