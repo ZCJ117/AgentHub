@@ -45,6 +45,7 @@ public class LocalCliProcessManager {
     private record ProcessContext(
             Process process,
             BufferedWriter stdinWriter,
+            BufferedReader reader,
             Thread stdoutReaderThread,
             FluxSink<AgentService.StreamDelta> responseSink,
             long spawnTime,
@@ -94,19 +95,17 @@ public class LocalCliProcessManager {
 
             long now = System.currentTimeMillis();
             ProcessContext ctx = new ProcessContext(
-                    p, stdinWriter, null, null, now, cliType);
+                    p, stdinWriter, null, null, null, now, cliType);
 
-            // 启动 stdout 读取线程
+            // 创建 stdout 读取线程（先不启动，等握手完成后再启动以避免竞态）
             var reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
             Thread readerThread = new Thread(
                     () -> stdoutLoop(agentId, reader),
                     "cli-stdout-" + agentId);
             readerThread.setDaemon(true);
 
-            // 用反射替换 ctx 中的 thread（record 不可变，改用临时方案）
             processes.put(agentId, new ProcessContext(
-                    p, stdinWriter, readerThread, null, now, cliType));
-            readerThread.start();
+                    p, stdinWriter, reader, readerThread, null, now, cliType));
 
             // 握手：等待适配器 ready
             String firstLine = readLineWithTimeout(reader, 10, TimeUnit.SECONDS);
@@ -140,6 +139,9 @@ public class LocalCliProcessManager {
                 throw new IllegalStateException(
                         "Expected 'ready' confirmation, got: " + confirmFrame.getType());
             }
+
+            // 握手完成后启动 stdout 读取线程，避免其与握手争夺同一个 BufferedReader
+            readerThread.start();
 
             log.info("[CliPM] Spawned {} for agent={} name={} pid={}",
                     cliType, agentId, agentName, p.pid());
@@ -203,6 +205,9 @@ public class LocalCliProcessManager {
         } catch (InterruptedException e) {
             ctx.process().destroyForcibly();
             Thread.currentThread().interrupt();
+        } finally {
+            try { ctx.stdinWriter().close(); } catch (Exception ignored) {}
+            try { ctx.reader().close(); } catch (Exception ignored) {}
         }
         log.info("[CliPM] Terminated agent={} pid={}", agentId, ctx.process().pid());
     }
@@ -218,6 +223,7 @@ public class LocalCliProcessManager {
             }
             return new ProcessContext(
                     ctx.process(), ctx.stdinWriter(),
+                    ctx.reader(),
                     ctx.stdoutReaderThread(), sink,
                     ctx.spawnTime(), ctx.cliType());
         });
@@ -227,6 +233,7 @@ public class LocalCliProcessManager {
         processes.computeIfPresent(agentId, (id, ctx) ->
                 new ProcessContext(
                         ctx.process(), ctx.stdinWriter(),
+                        ctx.reader(),
                         ctx.stdoutReaderThread(), null,
                         ctx.spawnTime(), ctx.cliType()));
     }
@@ -269,9 +276,9 @@ public class LocalCliProcessManager {
         } catch (IOException e) {
             log.info("[CliPM] stdout reader ended for agent={}: {}", agentId, e.getMessage());
         } finally {
-            // stdout 关闭 → 无论进程是否存活，都清理上下文以免泄漏
+            // stdout 关闭 → 仅在进程确实死亡时才清理上下文
             ProcessContext ctx = processes.get(agentId);
-            if (ctx != null) {
+            if (ctx != null && !ctx.process().isAlive()) {
                 terminate(agentId);
             }
         }
@@ -333,6 +340,14 @@ public class LocalCliProcessManager {
             terminate(agentId);
         }
         readerPool.shutdownNow();
+        try {
+            if (!readerPool.awaitTermination(5, TimeUnit.SECONDS)) {
+                log.warn("[CliPM] readerPool did not terminate in time");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("[CliPM] Interrupted while waiting for readerPool termination");
+        }
     }
 
     private String readLineWithTimeout(BufferedReader reader,
