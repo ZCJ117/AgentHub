@@ -1,11 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { NModal, NAvatar, NTag, NCheckbox, NButton, NInput, NSelect, NSpace } from 'naive-ui'
+import { NModal, NAvatar, NTag, NCheckbox, NButton, NInput, NSelect, NSpace, NRadio, NRadioGroup } from 'naive-ui'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
   agents: { type: Array, default: () => [] },
-  mode: { type: String, default: 'direct' } // 'direct' | 'group'
+  mode: { type: String, default: 'direct' }
 })
 
 const emit = defineEmits(['close', 'create'])
@@ -33,8 +33,10 @@ function parseTags(tags) {
 
 function handleCreate() {
   if (props.mode === 'direct') {
+    if (!selectedAgentId.value) return
     emit('create', { agentId: selectedAgentId.value, mode: 'direct' })
   } else {
+    if (selectedAgentIds.value.length < 2) return
     emit('create', {
       mode: 'group',
       title: groupTitle.value,
@@ -62,29 +64,33 @@ function close() {
         {{ mode === 'direct' ? '选择 AI Agent' : '创建群聊' }}
       </h3>
 
-      <!-- Direct mode: single agent selection -->
+      <!-- Direct mode: single agent selection with radio buttons -->
       <div v-if="mode === 'direct'" class="agent-list">
-        <div
-          v-for="agent in availableMembers"
-          :key="agent.id"
-          class="agent-option"
-          :class="{ selected: selectedAgentId === agent.id }"
-          @click="selectedAgentId = agent.id"
-        >
-          <NAvatar :size="36" round :src="agent.avatarUrl">
-            {{ (agent.name || 'AI')[0] }}
-          </NAvatar>
-          <div class="agent-info">
-            <span class="agent-name">{{ agent.name }}</span>
-            <span class="agent-desc">{{ agent.description || '' }}</span>
+        <NRadioGroup v-model:value="selectedAgentId">
+          <div
+            v-for="agent in availableMembers"
+            :key="agent.id"
+            class="agent-option"
+            :class="{ selected: selectedAgentId === agent.id }"
+          >
+            <NRadio :value="agent.id" />
+            <NAvatar :size="36" round :src="agent.avatarUrl">
+              {{ (agent.name || 'AI')[0] }}
+            </NAvatar>
+            <div class="agent-info">
+              <span class="agent-name">{{ agent.name }}</span>
+              <span class="agent-desc">{{ agent.description || '' }}</span>
+            </div>
+            <div class="agent-tags">
+              <NTag v-for="tag in parseTags(agent.capabilityTags).slice(0, 2)" :key="tag" size="tiny" :bordered="false">
+                {{ tag }}
+              </NTag>
+            </div>
           </div>
-          <NTag v-for="tag in parseTags(agent.capabilityTags)" :key="tag" size="tiny" :bordered="false">
-            {{ tag }}
-          </NTag>
-        </div>
+        </NRadioGroup>
       </div>
 
-      <!-- Group mode: multi-agent + config -->
+      <!-- Group mode: multi-agent selection with checkboxes -->
       <div v-else class="group-form">
         <NInput v-model:value="groupTitle" placeholder="群聊名称" style="margin-bottom: 12px" />
 
@@ -150,10 +156,10 @@ function close() {
   color: #1D1D1F;
 }
 
-.agent-list {
+.agent-list :deep(.n-radio-group) {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .agent-option {
@@ -164,6 +170,7 @@ function close() {
   border-radius: 14px;
   cursor: pointer;
   transition: background 0.15s;
+  border: 1.5px solid transparent;
 }
 
 .agent-option:hover {
@@ -171,7 +178,8 @@ function close() {
 }
 
 .agent-option.selected {
-  background: rgba(46,117,182,0.1);
+  background: rgba(46,117,182,0.08);
+  border-color: rgba(46,117,182,0.3);
 }
 
 .agent-info {
@@ -191,6 +199,12 @@ function close() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.agent-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .agent-check-list {
