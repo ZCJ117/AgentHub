@@ -178,10 +178,15 @@ public class LocalCliProcessManager {
         if (ctx == null) return;
 
         try {
-            // 优雅退出
+            // 优雅退出：直接写 stdin，不通过 sendFrame()（后者会查 processes map，ctx 已被 remove）
             try {
                 BridgeFrame terminateFrame = BridgeFrame.of("terminate", Map.of());
-                sendFrame(agentId, terminateFrame);
+                String json = terminateFrame.toJson();
+                synchronized (ctx.stdinWriter()) {
+                    ctx.stdinWriter().write(json);
+                    ctx.stdinWriter().newLine();
+                    ctx.stdinWriter().flush();
+                }
             } catch (Exception ignored) {}
 
             // 等待进程自行退出
@@ -206,28 +211,24 @@ public class LocalCliProcessManager {
 
     public void registerResponseSink(String agentId,
                                       FluxSink<AgentService.StreamDelta> sink) {
-        ProcessContext ctx = processes.get(agentId);
-        if (ctx == null || !ctx.process().isAlive()) {
-            sink.error(new IllegalStateException("Agent " + agentId + " is not running"));
-            return;
-        }
-        ProcessContext oldCtx = ctx;
-        ProcessContext newCtx = new ProcessContext(
-                oldCtx.process(), oldCtx.stdinWriter(),
-                oldCtx.stdoutReaderThread(), sink,
-                oldCtx.spawnTime(), oldCtx.cliType());
-        processes.put(agentId, newCtx);
+        processes.compute(agentId, (id, ctx) -> {
+            if (ctx == null || !ctx.process().isAlive()) {
+                sink.error(new IllegalStateException("Agent " + agentId + " is not running"));
+                return null;
+            }
+            return new ProcessContext(
+                    ctx.process(), ctx.stdinWriter(),
+                    ctx.stdoutReaderThread(), sink,
+                    ctx.spawnTime(), ctx.cliType());
+        });
     }
 
     public void unregisterResponseSink(String agentId) {
-        ProcessContext ctx = processes.get(agentId);
-        if (ctx != null) {
-            ProcessContext newCtx = new ProcessContext(
-                    ctx.process(), ctx.stdinWriter(),
-                    ctx.stdoutReaderThread(), null,
-                    ctx.spawnTime(), ctx.cliType());
-            processes.put(agentId, newCtx);
-        }
+        processes.computeIfPresent(agentId, (id, ctx) ->
+                new ProcessContext(
+                        ctx.process(), ctx.stdinWriter(),
+                        ctx.stdoutReaderThread(), null,
+                        ctx.spawnTime(), ctx.cliType()));
     }
 
     public void pushToSink(String agentId, AgentService.StreamDelta delta) {
@@ -268,9 +269,9 @@ public class LocalCliProcessManager {
         } catch (IOException e) {
             log.info("[CliPM] stdout reader ended for agent={}: {}", agentId, e.getMessage());
         } finally {
-            // stdout 关闭 → 进程可能已退出 → 清理
+            // stdout 关闭 → 无论进程是否存活，都清理上下文以免泄漏
             ProcessContext ctx = processes.get(agentId);
-            if (ctx != null && !ctx.process().isAlive()) {
+            if (ctx != null) {
                 terminate(agentId);
             }
         }
