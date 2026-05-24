@@ -2,10 +2,12 @@
 import { ref, onMounted, h } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { useRouter } from 'vue-router'
 import { NInput, NButton, NSpace, NCard, NModal, NForm, NFormItem, NDatePicker, NAlert, NPopconfirm, NDataTable, NEmpty } from 'naive-ui'
 import { updateProfile, changePassword } from '@/api/auth'
 import { fetchTokens, createToken, revokeToken } from '@/api/tokens'
 
+const router = useRouter()
 const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
 
@@ -120,7 +122,10 @@ async function savePassword() {
 
 <template>
   <div class="settings-view">
-    <h2>用户设置</h2>
+    <div class="page-header">
+      <NButton text @click="router.push('/chat')" style="font-size:18px">&larr; 返回</NButton>
+      <h2>用户设置</h2>
+    </div>
 
     <NCard title="个人信息" class="settings-card">
       <NSpace vertical :size="12">
@@ -156,6 +161,27 @@ async function savePassword() {
 
     <NCard title="关于" class="settings-card">
       <p>AgentHub 多 Agent 协同工作平台 v1.0</p>
+    </NCard>
+
+    <NCard title="本地 Agent 接入" size="small" style="margin-top:16px">
+      <template #header-extra>
+        <NTag type="info" size="small">BETA</NTag>
+      </template>
+      <NSpace vertical>
+        <NText>
+          使用本地 CLI Agent（Claude Code、OpenCode 等）接入平台：
+        </NText>
+        <NCard size="small" embedded>
+          <NCode code="claude --bridge wss://your-host/api/v1/agent-bridge/ws?token=mc_YOUR_PAT_TOKEN \
+       --name &quot;我的Claude&quot; \
+       --work-dir /home/dev/project" language="bash" />
+        </NCard>
+        <NText depth="3">
+          1. 先从上方「个人访问令牌」生成一个 PAT<br/>
+          2. 在本地终端执行上述命令<br/>
+          3. 连接成功后，Agent 将出现在 Agent 管理列表中
+        </NText>
+      </NSpace>
     </NCard>
 
     <NCard title="Personal Access Tokens" class="settings-card">
@@ -199,7 +225,8 @@ async function savePassword() {
 
 <style scoped>
 .settings-view { padding: 24px; max-width: 640px; margin: 0 auto; }
-.settings-view h2 { font-size: 22px; margin-bottom: 20px; }
+.page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.page-header h2 { font-size: 22px; font-weight: 600; }
 .settings-card { margin-bottom: 16px; border-radius: 14px; }
 label { font-size: 13px; color: #666; display: block; margin-bottom: 4px; }
 .msg { font-size: 13px; color: #34C759; }
