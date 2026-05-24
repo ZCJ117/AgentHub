@@ -1,0 +1,1 @@
+ALTER TABLE mate_agent ADD COLUMN cli_type VARCHAR(20) DEFAULT NULL;
