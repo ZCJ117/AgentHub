@@ -34,6 +34,7 @@ const enabled = ref(true)
 const isPublic = ref(true)
 const capabilityTags = ref([])
 const modelName = ref('')
+const cliType = ref('claude_code')
 const agentStatus = ref(null)
 
 // ── Skills tab state ──
@@ -53,10 +54,8 @@ const stats = ref(null)
 const loadingStats = ref(false)
 
 const agentTypes = [
-  { label: 'ReAct', value: 'react' },
-  { label: 'Plan-Execute', value: 'plan_execute' },
-  { label: 'Orchestrator', value: 'orchestrator' },
-  { label: '本地 CLI (local_cli)', value: 'local_cli' }
+  { label: 'Claude Code', value: 'claude_code' },
+  { label: 'OpenCode', value: 'open_code' }
 ]
 
 async function loadSkillsTab() {
@@ -139,10 +138,11 @@ onMounted(async () => {
       name.value = detail.name || ''
       description.value = detail.description || ''
       systemPrompt.value = detail.systemPrompt || ''
-      agentType.value = detail.agentType || 'react'
+      agentType.value = detail.agentType || 'local_cli'
+      cliType.value = detail.cliType || 'claude_code'
       enabled.value = detail.enabled !== false
-      isPublic.value = detail.isPublic !== false
-      capabilityTags.value = detail.capabilityTags || []
+      isPublic.value = detail.isPublic === 1 || detail.isPublic === true
+      capabilityTags.value = typeof detail.capabilityTags === 'string' ? JSON.parse(detail.capabilityTags) : (detail.capabilityTags || [])
       modelName.value = detail.modelName || ''
       agentStatus.value = detail.agentStatus || null
     }
@@ -167,10 +167,11 @@ async function save() {
       name: name.value,
       description: description.value,
       systemPrompt: systemPrompt.value,
-      agentType: agentType.value,
+      agentType: 'local_cli',
+      cliType: cliType.value,
       enabled: enabled.value,
-      isPublic: isPublic.value,
-      capabilityTags: capabilityTags.value,
+      isPublic: isPublic.value ? 1 : 0,
+      capabilityTags: JSON.stringify(capabilityTags.value),
       modelName: modelName.value
     }
     if (agentId.value === 'new') {
@@ -284,8 +285,8 @@ async function handleAvatarUpload(e) {
             <div class="config-form">
               <NSpace vertical :size="12">
                 <div>
-                  <label>Agent 类型</label>
-                  <NSelect v-model:value="agentType" :options="agentTypes" />
+                  <label>CLI 类型</label>
+                  <NSelect v-model:value="cliType" :options="agentTypes" placeholder="选择 CLI 类型" />
                 </div>
                 <NCard v-if="agentType === 'local_cli'" title="连接信息" size="small" style="margin-top:12px">
                   <NSpace vertical>
