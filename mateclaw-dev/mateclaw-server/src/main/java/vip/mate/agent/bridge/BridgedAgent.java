@@ -8,6 +8,7 @@ import vip.mate.agent.AgentState;
 import vip.mate.agent.BaseAgent;
 import vip.mate.agent.StructuredStreamCapable;
 import vip.mate.agent.bridge.model.BridgeFrame;
+import vip.mate.agent.cli.LocalCliProcessManager;
 import vip.mate.workspace.conversation.ConversationService;
 
 import java.util.Map;
@@ -22,24 +23,51 @@ import java.util.Map;
 public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
 
     private final AgentBridgeManager bridgeManager;
+    private final LocalCliProcessManager processManager;
 
-    /** AgentGraphBuilder 通过构造器注入 */
-    public BridgedAgent(ConversationService conversationService, AgentBridgeManager bridgeManager) {
+    /** CLI type for local process agents: claude_code / open_code */
+    private String cliType;
+
+    /** WebSocket bridge constructor */
+    public BridgedAgent(ConversationService conversationService,
+                        AgentBridgeManager bridgeManager) {
         super(null, conversationService);
         this.bridgeManager = bridgeManager;
+        this.processManager = null;
+    }
+
+    /** Process bridge constructor */
+    public BridgedAgent(ConversationService conversationService,
+                        AgentBridgeManager bridgeManager,
+                        LocalCliProcessManager processManager) {
+        super(null, conversationService);
+        this.bridgeManager = bridgeManager;
+        this.processManager = processManager;
+    }
+
+    public void setCliType(String cliType) {
+        this.cliType = cliType;
     }
 
     @Override
-    public Flux<AgentService.StreamDelta> chatStructuredStream(String userMessage, String conversationId) {
+    public Flux<AgentService.StreamDelta> chatStructuredStream(
+            String userMessage, String conversationId) {
+
+        // Prefer local process if available (claude_code / open_code)
+        if (processManager != null) {
+            return chatViaProcess(userMessage, conversationId);
+        }
+
+        // Fall back to WebSocket bridge
         if (!bridgeManager.isOnline(agentId)) {
-            return Flux.error(new IllegalStateException("Local agent '" + agentName + "' is offline"));
+            return Flux.error(new IllegalStateException(
+                    "Local agent '" + agentName + "' is offline"));
         }
 
         BridgeFrame request = BridgeFrame.of("chat_request", Map.of(
                 "message", userMessage,
                 "conversationId", conversationId,
-                "systemPrompt", systemPrompt != null ? systemPrompt : ""
-        ));
+                "systemPrompt", systemPrompt != null ? systemPrompt : ""));
 
         return Flux.<AgentService.StreamDelta>create(sink -> {
             setState(AgentState.RUNNING);
@@ -60,11 +88,48 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
 
             bridgeManager.send(agentId, request)
                     .exceptionally(ex -> {
-                        log.error("[BridgedAgent] Failed to send chat_request to agent={}: {}",
-                                agentId, ex.getMessage());
+                        log.error("[BridgedAgent] Failed to send chat_request: {}",
+                                ex.getMessage());
                         sink.error(ex);
                         return null;
                     });
+        }, FluxSink.OverflowStrategy.LATEST);
+    }
+
+    private Flux<AgentService.StreamDelta> chatViaProcess(
+            String userMessage, String conversationId) {
+        return Flux.<AgentService.StreamDelta>create(sink -> {
+            setState(AgentState.RUNNING);
+
+            boolean spawned = processManager.spawn(
+                    agentId, cliType, agentName, systemPrompt);
+
+            if (!spawned && !processManager.isRunning(agentId)) {
+                sink.error(new IllegalStateException(
+                        "Failed to start local agent '" + agentName + "'"));
+                return;
+            }
+
+            processManager.registerResponseSink(agentId, sink);
+
+            sink.onCancel(() -> {
+                processManager.sendFrame(agentId,
+                        BridgeFrame.of("stop_request", Map.of()));
+                setState(AgentState.IDLE);
+            });
+
+            sink.onDispose(() -> {
+                processManager.unregisterResponseSink(agentId);
+                setState(AgentState.IDLE);
+            });
+
+            BridgeFrame request = BridgeFrame.of("chat_request", Map.of(
+                    "message", userMessage,
+                    "conversationId", conversationId,
+                    "systemPrompt", systemPrompt != null ? systemPrompt : ""));
+
+            processManager.sendFrame(agentId, request);
+
         }, FluxSink.OverflowStrategy.LATEST);
     }
 
