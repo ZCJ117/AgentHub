@@ -23,6 +23,14 @@ const availableMembers = computed(() =>
   props.agents.filter(a => a.agentType !== 'orchestrator' && a.enabled !== false)
 )
 
+function parseTags(tags) {
+  if (Array.isArray(tags)) return tags
+  if (typeof tags === 'string') {
+    try { return JSON.parse(tags) } catch { return [] }
+  }
+  return []
+}
+
 function handleCreate() {
   if (props.mode === 'direct') {
     emit('create', { agentId: selectedAgentId.value, mode: 'direct' })
@@ -70,7 +78,7 @@ function close() {
             <span class="agent-name">{{ agent.name }}</span>
             <span class="agent-desc">{{ agent.description || '' }}</span>
           </div>
-          <NTag v-for="tag in (agent.capabilityTags || [])" :key="tag" size="tiny" :bordered="false">
+          <NTag v-for="tag in parseTags(agent.capabilityTags)" :key="tag" size="tiny" :bordered="false">
             {{ tag }}
           </NTag>
         </div>
@@ -93,7 +101,7 @@ function close() {
               {{ (agent.name || 'AI')[0] }}
             </NAvatar>
             <span class="agent-name">{{ agent.name }}</span>
-            <NTag v-for="tag in (agent.capabilityTags || []).slice(0, 2)" :key="tag" size="tiny" :bordered="false">
+            <NTag v-for="tag in parseTags(agent.capabilityTags).slice(0, 2)" :key="tag" size="tiny" :bordered="false">
               {{ tag }}
             </NTag>
           </div>
