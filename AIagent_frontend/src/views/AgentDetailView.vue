@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAgentStore } from '@/stores/agent'
-import { NAvatar, NTag, NButton, NInput, NTabs, NTabPane, NSpin, NSpace, NSwitch, NDynamicTags, NSelect, NIcon, NCheckboxGroup, NCheckbox, NEmpty, NGrid, NGridItem, NStatistic, NText } from 'naive-ui'
+import { NAvatar, NTag, NButton, NInput, NTabs, NTabPane, NSpin, NSpace, NSwitch, NDynamicTags, NSelect, NIcon, NCheckboxGroup, NCheckbox, NEmpty, NGrid, NGridItem, NStatistic, NText, NCard } from 'naive-ui'
 import { updateAgent, deleteAgent } from '@/api/agents'
 import { CameraOutline } from '@vicons/ionicons5'
 import { getToken } from '@/utils/token'
@@ -34,6 +34,7 @@ const enabled = ref(true)
 const isPublic = ref(true)
 const capabilityTags = ref([])
 const modelName = ref('')
+const agentStatus = ref(null)
 
 // ── Skills tab state ──
 const availableSkills = ref([])
@@ -54,7 +55,8 @@ const loadingStats = ref(false)
 const agentTypes = [
   { label: 'ReAct', value: 'react' },
   { label: 'Plan-Execute', value: 'plan_execute' },
-  { label: 'Orchestrator', value: 'orchestrator' }
+  { label: 'Orchestrator', value: 'orchestrator' },
+  { label: '本地 CLI (local_cli)', value: 'local_cli' }
 ]
 
 async function loadSkillsTab() {
@@ -142,6 +144,7 @@ onMounted(async () => {
       isPublic.value = detail.isPublic !== false
       capabilityTags.value = detail.capabilityTags || []
       modelName.value = detail.modelName || ''
+      agentStatus.value = detail.agentStatus || null
     }
     // Lazy-load active tab
     if (activeTab.value === 'skills') loadSkillsTab()
@@ -284,7 +287,21 @@ async function handleAvatarUpload(e) {
                   <label>Agent 类型</label>
                   <NSelect v-model:value="agentType" :options="agentTypes" />
                 </div>
-                <div>
+                <NCard v-if="agentType === 'local_cli'" title="连接信息" size="small" style="margin-top:12px">
+                  <NSpace vertical>
+                    <div>
+                      <NText depth="3">连接状态</NText>
+                      <NTag :type="agentStatus === 'AVAILABLE' ? 'success' : 'default'" size="small">
+                        {{ agentStatus === 'AVAILABLE' ? '在线' : '离线' }}
+                      </NTag>
+                    </div>
+                    <NText depth="3">
+                      本地 CLI Agent 通过 WebSocket 连接到平台，模型在本地运行。
+                      请在「设置 → 本地 Agent 接入」中获取接入 Token 和使用说明。
+                    </NText>
+                  </NSpace>
+                </NCard>
+                <div v-if="agentType !== 'local_cli'">
                   <label>模型</label>
                   <NInput v-model:value="modelName" placeholder="模型名称" />
                 </div>
