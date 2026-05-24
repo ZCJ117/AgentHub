@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { NModal, NAvatar, NTag, NCheckbox, NButton, NInput, NSelect, NInputNumber, NSpace } from 'naive-ui'
+import { NModal, NAvatar, NTag, NCheckbox, NButton, NInput, NSelect, NSpace } from 'naive-ui'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -14,12 +14,9 @@ const selectedAgentId = ref(null)
 const selectedAgentIds = ref([])
 const groupTitle = ref('')
 const orchestratorAgentId = ref(null)
-const schedulingMode = ref('auto')
-const failurePolicy = ref('fail_tolerant')
-const maxParallelTasks = ref(4)
 
-const availableOrchestrators = computed(() =>
-  props.agents.filter(a => a.agentType === 'orchestrator')
+const orchestratorCandidates = computed(() =>
+  props.agents.filter(a => a.cliType === 'claude_code')
 )
 
 const availableMembers = computed(() =>
@@ -34,10 +31,10 @@ function handleCreate() {
       mode: 'group',
       title: groupTitle.value,
       agentIds: selectedAgentIds.value,
-      orchestratorAgentId: orchestratorAgentId.value || (availableOrchestrators.value[0]?.id),
-      schedulingMode: schedulingMode.value,
-      failurePolicy: failurePolicy.value,
-      maxParallelTasks: maxParallelTasks.value
+      orchestratorAgentId: orchestratorAgentId.value || (orchestratorCandidates.value[0]?.id),
+      schedulingMode: 'auto',
+      failurePolicy: 'fail_tolerant',
+      maxParallelTasks: 4
     })
   }
 }
@@ -106,28 +103,10 @@ function close() {
           <NSpace vertical :size="8">
             <NSelect
               v-model:value="orchestratorAgentId"
-              :options="availableOrchestrators.map(a => ({ label: a.name, value: a.id }))"
+              :options="orchestratorCandidates.map(a => ({ label: a.name, value: a.id }))"
               placeholder="选择 Orchestrator (可选)"
               clearable
             />
-            <NSelect
-              v-model:value="schedulingMode"
-              :options="[
-                { label: '自动分派', value: 'auto' },
-                { label: '手动 @ 指定', value: 'manual' }
-              ]"
-            />
-            <NSelect
-              v-model:value="failurePolicy"
-              :options="[
-                { label: '失败继续', value: 'fail_tolerant' },
-                { label: '失败立即停止', value: 'fail_fast' }
-              ]"
-            />
-            <div style="display: flex; align-items: center; gap: 8px">
-              <span style="font-size: 13px">最大并行任务</span>
-              <NInputNumber v-model:value="maxParallelTasks" :min="1" :max="8" size="small" style="width: 80px" />
-            </div>
           </NSpace>
         </div>
       </div>
