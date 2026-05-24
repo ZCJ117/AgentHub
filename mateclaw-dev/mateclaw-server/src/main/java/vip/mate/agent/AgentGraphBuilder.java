@@ -16,6 +16,7 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Component;
 import vip.mate.agent.bridge.AgentBridgeManager;
 import vip.mate.agent.bridge.BridgedAgent;
+import vip.mate.agent.cli.LocalCliProcessManager;
 import vip.mate.agent.graph.StateGraphReActAgent;
 import vip.mate.agent.graph.NodeStreamingChatHelper;
 import vip.mate.agent.graph.executor.ToolExecutionExecutor;
@@ -114,6 +115,7 @@ public class AgentGraphBuilder {
     private final vip.mate.llm.routing.MultimodalRouter multimodalRouter;
     private final vip.mate.llm.routing.MediaCaptionService mediaCaptionService;
     private final AgentBridgeManager agentBridgeManager;
+    private final LocalCliProcessManager localCliProcessManager;
 
     /**
      * Optional audit pipeline. Setter injection (rather than a constructor
@@ -386,10 +388,12 @@ public class AgentGraphBuilder {
 
     /**
      * Build a BridgedAgent for local_cli type — no StateGraph needed;
-     * chat is relayed over WebSocket to the local CLI process.
+     * chat is relayed over stdin/stdout to the local CLI process.
      */
     BridgedAgent buildBridgedAgent(AgentEntity entity) {
-        BridgedAgent agent = new BridgedAgent(conversationService, agentBridgeManager);
+        BridgedAgent agent = new BridgedAgent(conversationService,
+                agentBridgeManager, localCliProcessManager);
+        agent.setCliType(entity.getCliType());
         return agent;
     }
 
