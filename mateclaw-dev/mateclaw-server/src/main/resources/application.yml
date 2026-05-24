@@ -203,6 +203,11 @@ mateclaw:
     max-connections-per-workspace: 20
     auto-register: true
     frame-max-size: 65536
+  local-cli:
+    node-bin: "node"
+    adapters-dir: "adapters"
+    timeout-seconds: 300
+    force-kill-seconds: 5
 
 # MateClaw Agent 配置
 mate:
