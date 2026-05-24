@@ -13,7 +13,8 @@ const typeTabs = [
   { name: '', label: '全部' },
   { name: 'react', label: 'ReAct' },
   { name: 'plan_execute', label: 'Plan-Execute' },
-  { name: 'orchestrator', label: 'Orchestrator' }
+  { name: 'orchestrator', label: 'Orchestrator' },
+  { name: 'local_cli', label: '本地CLI' }
 ]
 
 onMounted(() => {
@@ -38,7 +39,10 @@ function statusColor(status) {
 <template>
   <div class="agent-manage">
     <div class="page-header">
-      <h2>Agent 管理</h2>
+      <div class="header-left">
+        <NButton text @click="router.push('/chat')" class="back-btn">← 返回主页</NButton>
+        <h2>Agent 管理</h2>
+      </div>
       <NSpace>
         <NInput v-model:value="searchKeyword" placeholder="搜索 Agent..." clearable style="width: 200px" />
         <NButton type="primary" @click="router.push('/agents/new')">+ 新建 Agent</NButton>
@@ -62,7 +66,10 @@ function statusColor(status) {
               </NBadge>
             </div>
             <div class="agent-card-body">
-              <div class="agent-name">{{ agent.name }}</div>
+              <div class="agent-name">
+                <span v-if="agent.agentType === 'local_cli'" style="margin-right:4px;font-size:14px">&#x1F5A5;</span>
+                {{ agent.name }}
+              </div>
               <div class="agent-desc">{{ agent.description || '暂无描述' }}</div>
               <div class="agent-tags">
                 <NTag v-for="tag in (agent.capabilityTags || [])" :key="tag" size="tiny" :bordered="false">
@@ -71,9 +78,17 @@ function statusColor(status) {
               </div>
             </div>
             <div class="agent-card-footer">
-              <NTag size="tiny" :type="agent.agentType === 'orchestrator' ? 'info' : 'default'">
-                {{ agent.agentType }}
-              </NTag>
+              <NSpace size="6" align="center">
+                <NTag size="tiny" :type="agent.agentType === 'orchestrator' ? 'info' : agent.agentType === 'local_cli' ? 'warning' : 'default'">
+                  {{ agent.agentType }}
+                </NTag>
+                <!-- Online status indicator for local_cli agents -->
+                <NTag v-if="agent.agentType === 'local_cli'"
+                      :type="agent.agentStatus === 'AVAILABLE' ? 'success' : 'default'"
+                      size="tiny" round>
+                  {{ agent.agentStatus === 'AVAILABLE' ? '在线' : '离线' }}
+                </NTag>
+              </NSpace>
             </div>
           </NCard>
         </NGi>
@@ -86,6 +101,8 @@ function statusColor(status) {
 <style scoped>
 .agent-manage { padding: 24px; max-width: 1200px; margin: 0 auto; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.back-btn { font-size: 14px; color: #666; }
 .page-header h2 { font-size: 22px; font-weight: 600; }
 .agent-card { border-radius: 14px; cursor: pointer; }
 .agent-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
