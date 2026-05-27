@@ -36,6 +36,7 @@ public class GroupOrchestratorService {
         Map<String, Object> chatModel = (Map<String, Object>) module.get("chat-model");
 
         String baseUrl = (String) aiApi.get("base-url");
+        String completionsPath = (String) aiApi.get("completions-path");
         String apiKey = (String) aiApi.get("api-key");
         this.model = (String) chatModel.get("model");
 
@@ -45,13 +46,18 @@ public class GroupOrchestratorService {
                 ? agentList.get(0).get("instruction")
                 : "";
 
+        String fullUrl = baseUrl;
+        if (completionsPath != null && !completionsPath.isBlank()) {
+            fullUrl = baseUrl.replaceAll("/+$", "") + "/" + completionsPath.replaceAll("^/+", "");
+        }
+
         this.webClient = WebClient.builder()
-                .baseUrl(baseUrl)
+                .baseUrl(fullUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader("Content-Type", "application/json")
                 .build();
 
-        log.info("GroupOrchestratorService initialized: model={}, baseUrl={}", model, baseUrl);
+        log.info("GroupOrchestratorService initialized: model={}, url={}", model, fullUrl);
     }
 
     @SuppressWarnings("unchecked")

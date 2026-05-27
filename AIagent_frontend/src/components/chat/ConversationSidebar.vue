@@ -52,7 +52,13 @@ async function handleCreateConversation(config) {
         maxParallelTasks: config.maxParallelTasks
       })
       if (result?.conversationId) {
-        selectConversation(result.conversationId)
+        // Find by UUID to get the Long id for activeConversation matching
+        const conv = convStore.conversations.find(
+          c => c.conversationId === result.conversationId
+        )
+        if (conv) {
+          selectConversation(conv)
+        }
       }
     } catch (err) {
       console.warn('Failed to create group:', err)
