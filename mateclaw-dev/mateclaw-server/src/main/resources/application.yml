@@ -17,14 +17,19 @@ spring:
     virtual:
       enabled: true
   profiles:
-    active: dev
+    active: dev,mysql
 
   # 数据源（默认 H2，生产切换为 mysql profile）
   datasource:
     url: jdbc:h2:file:./data/mateclaw;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
     driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    username: root # 数据库用户名
+    password: 520117
+#    datasource:
+#      driver-class-name: com.mysql.cj.jdbc.Driver # 数据库驱动类名，MySQL 8.x 使用 com.mysql.cj.jdbc.Driver
+#      url: jdbc:mysql://127.0.0.1:3306/hmdp?useSSL=false&serverTimezone=UTC # 数据库连接URL，格式：jdbc:mysql://ip:port/数据库名?参数
+#      username: root # 数据库用户名
+#      password: 520117 # 数据库密码
     # Issue #50: explicit Hikari sizing. Default of 10 was being exhausted
     # by O(100) cron jobs firing on minute boundaries (each run holds 3-4
     # connections sequentially) plus ChannelHealthMonitor's per-minute scan.
@@ -208,6 +213,7 @@ mateclaw:
     adapters-dir: "adapters"
     timeout-seconds: 300
     force-kill-seconds: 5
+    show-terminal: true
 
 # MateClaw Agent 配置
 mate:
@@ -297,3 +303,8 @@ mate:
       contradiction-check-enabled: false       # experimental simple detection, enable after LLM batch impl
       trust-half-life-days: 60
       forget-enabled: true
+
+# arther-agent engine base URL for Orchestrator calls
+arther:
+  agent:
+    base-url: http://127.0.0.1:8091
