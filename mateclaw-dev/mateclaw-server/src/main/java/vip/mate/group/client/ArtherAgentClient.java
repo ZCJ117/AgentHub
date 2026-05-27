@@ -1,5 +1,7 @@
 package vip.mate.group.client;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -19,6 +21,7 @@ import java.util.Map;
 public class ArtherAgentClient {
 
     private final WebClient webClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final String ORCHESTRATOR_AGENT_ID = "000001";
 
@@ -72,18 +75,17 @@ public class ArtherAgentClient {
      * arther-agent emits: data: {"type":"textDelta","text":"..."}
      * Returns null if the line is not a textDelta event.
      */
-    public static String extractTextFromSseLine(String sseLine) {
+    public String extractTextFromSseLine(String sseLine) {
         if (sseLine == null || !sseLine.startsWith("data: ")) return null;
         String json = sseLine.substring(6).trim();
-        if (!json.contains("\"textDelta\"")) return null;
-        int textIdx = json.indexOf("\"text\":\"");
-        if (textIdx == -1) return null;
-        int start = textIdx + 8;
-        int end = json.indexOf("\"", start);
-        if (end == -1) return null;
-        return json.substring(start, end)
-                .replace("\\n", "\n")
-                .replace("\\\"", "\"")
-                .replace("\\\\", "\\");
+        try {
+            JsonNode node = objectMapper.readTree(json);
+            if (!"textDelta".equals(node.path("type").asText())) return null;
+            JsonNode textNode = node.get("text");
+            return textNode != null ? textNode.asText() : null;
+        } catch (Exception e) {
+            // Non-JSON SSE lines (comments, empty lines) are silently skipped
+            return null;
+        }
     }
 }

@@ -665,7 +665,7 @@ public class ChatController {
 
                     agentFlux = artherAgentClient.callOrchestrator(username, orchPrompt)
                             .map(sseLine -> {
-                                String text = ArtherAgentClient.extractTextFromSseLine(sseLine);
+                                String text = artherAgentClient.extractTextFromSseLine(sseLine);
                                 if (text != null) {
                                     // Feed text through line buffer for @AgentName detection
                                     for (int i = 0; i < text.length(); i++) {
