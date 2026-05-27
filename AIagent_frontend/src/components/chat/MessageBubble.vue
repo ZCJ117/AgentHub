@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, watch } from 'vue'
-import { renderMarkdown } from '@/composables/useMarkdown'
+import { renderMarkdown, highlightAgentMentions } from '@/composables/useMarkdown'
 import { NAvatar, NButton, NCode, NTag, NIcon, NImage } from 'naive-ui'
 import { PinOutline, Pin } from '@vicons/ionicons5'
 import PlanCard from './PlanCard.vue'
@@ -40,7 +40,8 @@ const isError = computed(() => props.message.status === 'error')
 
 const renderedContent = computed(() => {
   if (props.message.messageType === 'text' || props.message.messageType === 'system') {
-    return renderMarkdown(props.message.content || '')
+    const highlighted = highlightAgentMentions(props.message.content || '')
+    return renderMarkdown(highlighted)
   }
   return ''
 })
@@ -335,6 +336,15 @@ watch(isStreaming, (newVal, oldVal) => {
   padding-left: 12px;
   color: #666;
   margin: 8px 0;
+}
+
+.msg-text :deep(.agent-mention) {
+  background: #E8F0FE;
+  color: #1A56DB;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .msg-reactions {
