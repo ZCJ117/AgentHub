@@ -9,9 +9,17 @@ import vip.mate.agent.BaseAgent;
 import vip.mate.agent.StructuredStreamCapable;
 import vip.mate.agent.bridge.model.BridgeFrame;
 import vip.mate.agent.cli.LocalCliProcessManager;
+import vip.mate.agent.model.AgentEntity;
+import vip.mate.agent.repository.AgentMapper;
 import vip.mate.workspace.conversation.ConversationService;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
+import vip.mate.workspace.conversation.model.MessageEntity;
 
 /**
  * 本地 Agent 桥接 — 通过 WebSocket 将聊天请求转发到本地 CLI Agent。
@@ -24,25 +32,30 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
 
     private final AgentBridgeManager bridgeManager;
     private final LocalCliProcessManager processManager;
+    private final AgentMapper agentMapper;
 
     /** CLI type for local process agents: claude_code / open_code */
     private String cliType;
 
     /** WebSocket bridge constructor */
     public BridgedAgent(ConversationService conversationService,
-                        AgentBridgeManager bridgeManager) {
+                        AgentBridgeManager bridgeManager,
+                        AgentMapper agentMapper) {
         super(null, conversationService);
         this.bridgeManager = bridgeManager;
         this.processManager = null;
+        this.agentMapper = agentMapper;
     }
 
     /** Process bridge constructor */
     public BridgedAgent(ConversationService conversationService,
                         AgentBridgeManager bridgeManager,
-                        LocalCliProcessManager processManager) {
+                        LocalCliProcessManager processManager,
+                        AgentMapper agentMapper) {
         super(null, conversationService);
         this.bridgeManager = bridgeManager;
         this.processManager = processManager;
+        this.agentMapper = agentMapper;
     }
 
     public void setCliType(String cliType) {
@@ -102,7 +115,7 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
             setState(AgentState.RUNNING);
 
             boolean spawned = processManager.spawn(
-                    agentId, cliType, agentName, systemPrompt);
+                    agentId, cliType, agentName, systemPrompt, null);
 
             if (!spawned && !processManager.isRunning(agentId)) {
                 sink.error(new IllegalStateException(
@@ -123,10 +136,18 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
                 setState(AgentState.IDLE);
             });
 
-            BridgeFrame request = BridgeFrame.of("chat_request", Map.of(
-                    "message", userMessage,
-                    "conversationId", conversationId,
-                    "systemPrompt", systemPrompt != null ? systemPrompt : ""));
+            // Build conversation context from recent history
+            String contextualMessage = buildContextualMessage(userMessage, conversationId);
+
+            String sessionId = processManager.getSessionId(agentId);
+            Map<String, Object> chatPayload = new java.util.LinkedHashMap<>();
+            chatPayload.put("message", contextualMessage);
+            chatPayload.put("conversationId", conversationId);
+            chatPayload.put("systemPrompt", systemPrompt != null ? systemPrompt : "");
+            if (sessionId != null && !sessionId.isBlank()) {
+                chatPayload.put("sessionId", sessionId);
+            }
+            BridgeFrame request = BridgeFrame.of("chat_request", chatPayload);
 
             try {
                 processManager.sendFrame(agentId, request);
@@ -138,6 +159,53 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
             }
 
         }, FluxSink.OverflowStrategy.LATEST);
+    }
+
+    /**
+     * Build a contextual message by prepending recent conversation history
+     * so the CLI agent has multi-turn context.
+     */
+    private String buildContextualMessage(String userMessage, String conversationId) {
+        try {
+            List<MessageEntity> history = conversationService.listRecentMessages(conversationId, 20);
+            if (history == null || history.isEmpty()) {
+                return userMessage;
+            }
+
+            StringBuilder ctx = new StringBuilder();
+            ctx.append("# 以下是对话历史上下文\n\n");
+            Map<Long, String> agentNameCache = new HashMap<>();
+            for (MessageEntity msg : history) {
+                String roleLabel;
+                if ("user".equals(msg.getRole())) {
+                    roleLabel = "用户";
+                } else if (msg.getSenderAgentId() != null) {
+                    roleLabel = agentNameCache.computeIfAbsent(msg.getSenderAgentId(), id -> {
+                        if (agentMapper != null) {
+                            AgentEntity ag = agentMapper.selectById(id);
+                            return ag != null ? ag.getName() : "Agent#" + id;
+                        }
+                        return "Agent#" + id;
+                    });
+                } else {
+                    roleLabel = "AI助手";
+                }
+                String content = conversationService.renderMessageContent(msg);
+                if (content != null && !content.isBlank()) {
+                    ctx.append(roleLabel).append(": ").append(content).append("\n\n");
+                }
+            }
+            ctx.append("---\n");
+            ctx.append("# 用户最新消息\n");
+            ctx.append(userMessage);
+
+            log.debug("[BridgedAgent] Built context for conversation={}, historyMsgs={}",
+                    conversationId, history.size());
+            return ctx.toString();
+        } catch (Exception e) {
+            log.warn("[BridgedAgent] Failed to build conversation context: {}", e.getMessage());
+            return userMessage;
+        }
     }
 
     @Override

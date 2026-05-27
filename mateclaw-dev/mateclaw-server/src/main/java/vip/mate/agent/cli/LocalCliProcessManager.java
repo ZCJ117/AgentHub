@@ -8,8 +8,10 @@ import reactor.core.publisher.FluxSink;
 import vip.mate.agent.AgentService;
 import vip.mate.agent.bridge.model.BridgeFrame;
 
+import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.*;
 
@@ -42,6 +44,18 @@ public class LocalCliProcessManager {
     /** agentId → 进程上下文 */
     private final ConcurrentHashMap<String, ProcessContext> processes = new ConcurrentHashMap<>();
 
+    /** agentId → pending error (received before sink registration) */
+    private final ConcurrentHashMap<String, Throwable> pendingErrors = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    void initAdaptDir() {
+        File dir = new File(adaptersDir);
+        if (!dir.isAbsolute()) {
+            adaptersDir = new File(System.getProperty("user.dir"), adaptersDir).getAbsolutePath();
+        }
+        log.info("[CliPM] Adapters directory: {}", adaptersDir);
+    }
+
     private record ProcessContext(
             Process process,
             BufferedWriter stdinWriter,
@@ -51,6 +65,13 @@ public class LocalCliProcessManager {
             long spawnTime,
             String cliType
     ) {}
+
+    /** Persistent Claude Code session IDs for --resume across chat requests */
+    private final ConcurrentHashMap<String, String> sessionIds = new ConcurrentHashMap<>();
+
+    public String getSessionId(String agentId) {
+        return sessionIds.get(agentId);
+    }
 
     // ── Public API ───────────────────────────────────────────────────
 
@@ -63,7 +84,8 @@ public class LocalCliProcessManager {
      * 启动 CLI 子进程。返回 true 表示成功，false 表示已在运行。
      */
     public boolean spawn(String agentId, String cliType,
-                         String agentName, String systemPrompt) {
+                         String agentName, String systemPrompt,
+                         String claudeMdPath) {
         if (isRunning(agentId)) {
             log.warn("[CliPM] Agent {} already running, skip spawn", agentId);
             return false;
@@ -78,8 +100,9 @@ public class LocalCliProcessManager {
         File adapterFile = new File(adapterPath);
         if (!adapterFile.exists()) {
             throw new IllegalStateException(
-                    "Adapter script not found: " + adapterFile.getAbsolutePath()
-                    + " — 请确保 adapters/ 目录已部署");
+                    "Local CLI adapter not found: " + adapterFile.getAbsolutePath()
+                    + ". Ensure the adapters/ directory (claude-adapter.mjs, opencode-adapter.mjs)"
+                    + " is deployed, or set mateclaw.local-cli.adapters-dir in application.yml");
         }
 
         try {
@@ -87,22 +110,32 @@ public class LocalCliProcessManager {
             pb.environment().put("AGENT_ID", agentId);
             pb.environment().put("AGENT_NAME", agentName);
             pb.environment().put("SYSTEM_PROMPT", systemPrompt != null ? systemPrompt : "");
-            pb.redirectErrorStream(true);
+            if (claudeMdPath != null && !claudeMdPath.isBlank()) {
+                pb.environment().put("CLAUDE_MD_PATH", claudeMdPath);
+            }
             Process p = pb.start();
 
             var stdinWriter = new BufferedWriter(
-                    new OutputStreamWriter(p.getOutputStream()));
+                    new OutputStreamWriter(p.getOutputStream(), StandardCharsets.UTF_8));
 
             long now = System.currentTimeMillis();
             ProcessContext ctx = new ProcessContext(
                     p, stdinWriter, null, null, null, now, cliType);
 
             // 创建 stdout 读取线程（先不启动，等握手完成后再启动以避免竞态）
-            var reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
+            var reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
             Thread readerThread = new Thread(
                     () -> stdoutLoop(agentId, reader),
                     "cli-stdout-" + agentId);
             readerThread.setDaemon(true);
+
+            // stderr 读取线程 — 独立日志，避免污染 BridgeFrame 解析
+            var stderrReader = new BufferedReader(new InputStreamReader(p.getErrorStream(), StandardCharsets.UTF_8));
+            Thread stderrThread = new Thread(
+                    () -> stderrLoop(agentId, stderrReader),
+                    "cli-stderr-" + agentId);
+            stderrThread.setDaemon(true);
+            stderrThread.start();
 
             processes.put(agentId, new ProcessContext(
                     p, stdinWriter, reader, readerThread, null, now, cliType));
@@ -111,7 +144,9 @@ public class LocalCliProcessManager {
             String firstLine = readLineWithTimeout(reader, 10, TimeUnit.SECONDS);
             if (firstLine == null) {
                 terminate(agentId);
-                throw new IllegalStateException("适配器未在 10 秒内返回 ready 信号");
+                throw new IllegalStateException(
+                        "Local CLI adapter did not respond within 10 seconds."
+                        + " Ensure Node.js is installed and the adapter script is not hanging.");
             }
             BridgeFrame readyFrame = BridgeFrame.parse(firstLine);
             if (!"ready".equals(readyFrame.getType())) {
@@ -148,7 +183,10 @@ public class LocalCliProcessManager {
             return true;
 
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to spawn CLI process: " + e.getMessage(), e);
+            throw new UncheckedIOException(
+                    "Failed to start local CLI process for " + cliType
+                    + ". Check that Node.js ('" + nodeBin + "') is installed and '"
+                    + adapterPath + "' is accessible.", e);
         }
     }
 
@@ -177,6 +215,7 @@ public class LocalCliProcessManager {
      */
     public void terminate(String agentId) {
         ProcessContext ctx = processes.remove(agentId);
+        pendingErrors.remove(agentId);
         if (ctx == null) return;
 
         try {
@@ -216,6 +255,12 @@ public class LocalCliProcessManager {
 
     public void registerResponseSink(String agentId,
                                       FluxSink<AgentService.StreamDelta> sink) {
+        // Replay pending error if one was received before sink registration
+        Throwable pending = pendingErrors.remove(agentId);
+        if (pending != null) {
+            sink.error(pending);
+            return;
+        }
         processes.compute(agentId, (id, ctx) -> {
             if (ctx == null || !ctx.process().isAlive()) {
                 sink.error(new IllegalStateException("Agent " + agentId + " is not running"));
@@ -261,18 +306,37 @@ public class LocalCliProcessManager {
 
     // ── Internal ─────────────────────────────────────────────────────
 
-    private void stdoutLoop(String agentId, BufferedReader reader) {
+    private void stderrLoop(String agentId, BufferedReader reader) {
         try {
             String line;
             while ((line = reader.readLine()) != null) {
+                log.info("[CliPM:{}] {}", agentId, line);
+            }
+        } catch (IOException e) {
+            log.debug("[CliPM] stderr reader ended for agent={}: {}", agentId, e.getMessage());
+        }
+    }
+
+    private void stdoutLoop(String agentId, BufferedReader reader) {
+        try {
+            String line;
+            int lineCount = 0;
+            while ((line = reader.readLine()) != null) {
+                lineCount++;
                 try {
                     BridgeFrame frame = BridgeFrame.parse(line);
+                    if ("text".equals(frame.getType())) {
+                        log.info("[CliPM] stdout line#{} type=text agent={} len={}",
+                                lineCount, agentId, line.length());
+                    }
                     dispatch(agentId, frame);
                 } catch (Exception e) {
-                    log.warn("[CliPM] Failed to parse stdout line for agent={}: {}",
-                            agentId, e.getMessage());
+                    log.warn("[CliPM] Failed to parse stdout line#{} for agent={}: {} — line[0:100]={}",
+                            lineCount, agentId, e.getMessage(),
+                            line.length() > 100 ? line.substring(0, 100) : line);
                 }
             }
+            log.info("[CliPM] stdoutLoop ended for agent={}, totalLines={}", agentId, lineCount);
         } catch (IOException e) {
             log.info("[CliPM] stdout reader ended for agent={}: {}", agentId, e.getMessage());
         } finally {
@@ -290,6 +354,9 @@ public class LocalCliProcessManager {
                 String delta = frame.getPayload() != null
                         ? String.valueOf(frame.getPayload().getOrDefault("delta", ""))
                         : "";
+                log.info("[CliPM] text frame agent={} deltaLen={} sinkActive={}",
+                        agentId, delta.length(),
+                        processes.get(agentId) != null && processes.get(agentId).responseSink() != null);
                 pushToSink(agentId, new AgentService.StreamDelta(delta, null));
             }
             case "tool_call" ->
@@ -318,18 +385,34 @@ public class LocalCliProcessManager {
                 completeSink(agentId);
             }
 
-            case "error" ->
-                errorSink(agentId, new RuntimeException(
-                        frame.getPayload() != null
-                                ? String.valueOf(frame.getPayload()
-                                    .getOrDefault("message", "unknown"))
-                                : "unknown"));
+            case "error" -> {
+                String msg = frame.getPayload() != null
+                        ? String.valueOf(frame.getPayload()
+                            .getOrDefault("message", "unknown"))
+                        : "unknown";
+                RuntimeException ex = new RuntimeException("Local CLI error: " + msg);
+                ProcessContext errorCtx = processes.get(agentId);
+                if (errorCtx != null && errorCtx.responseSink() != null) {
+                    errorSink(agentId, ex);
+                } else {
+                    pendingErrors.put(agentId, ex);
+                    log.warn("[CliPM] Error received before sink ready for agent={}: {}", agentId, msg);
+                }
+            }
 
+            case "session_info" -> {
+                if (frame.getPayload() != null && frame.getPayload().get("sessionId") != null) {
+                    String sid = frame.getPayload().get("sessionId").toString();
+                    sessionIds.put(agentId, sid);
+                    log.info("[CliPM] Captured session_id={} for agent={}", sid, agentId);
+                }
+            }
             case "pong" -> {} // heartbeat response, ignore
 
             default ->
-                log.debug("[CliPM] Unhandled frame type '{}' from agent={}",
-                        frame.getType(), agentId);
+                log.warn("[CliPM] Unhandled frame type '{}' from agent={} payloadKeys={}",
+                        frame.getType(), agentId,
+                        frame.getPayload() != null ? frame.getPayload().keySet() : "null");
         }
     }
 
