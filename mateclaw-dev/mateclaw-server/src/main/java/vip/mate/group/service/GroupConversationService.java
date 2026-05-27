@@ -37,7 +37,7 @@ public class GroupConversationService {
     /**
      * Generate the Orchestrator's CLAUDE.md content with the agent list.
      */
-    private String buildOrchestratorClaudeMd(List<Long> memberAgentIds) {
+    private String buildOrchestratorClaudeMd(List<AgentEntity> memberAgents) {
         StringBuilder sb = new StringBuilder();
         sb.append("你是一个 Orchestrator 调度者。你的任务是根据用户的输入，为我提供的多个 Agent 分派任务。\n");
         sb.append("你必须使用 \"@Agent名称\" 的形式来指派任务。\n");
@@ -48,9 +48,7 @@ public class GroupConversationService {
         sb.append("在输出中，你对每个 Agent 的指派必须独占一行，格式严格为：@Agent名: 任务内容\n\n");
         sb.append("可用 Agent 列表：\n\n");
 
-        for (Long agentId : memberAgentIds) {
-            AgentEntity ag = agentMapper.selectById(agentId);
-            if (ag == null) continue;
+        for (AgentEntity ag : memberAgents) {
             sb.append("· Agent名称: ").append(ag.getName()).append("\n");
             sb.append("  能力: ").append(ag.getDescription() != null ? ag.getDescription() : "通用助手").append("\n");
         }
@@ -152,19 +150,31 @@ public class GroupConversationService {
             }
         }
 
-        // Generate CLAUDE.md files for orchestrator and each member agent
+        return buildGroupResponse(conv, gc);
+    }
+
+    /**
+     * Generate CLAUDE.md files for orchestrator and each member agent.
+     * This is intentionally NOT @Transactional — file I/O should not be inside a DB transaction.
+     * Call this AFTER createGroup() returns successfully.
+     */
+    public void generateClaudeMdFiles(Long conversationDbId, Long orchestratorAgentId, List<Long> agentIds) {
+        AgentEntity orchestrator = agentMapper.selectById(orchestratorAgentId);
+        if (orchestrator == null) {
+            log.warn("Orchestrator agent {} not found, skipping CLAUDE.md generation", orchestratorAgentId);
+            return;
+        }
+
         List<Long> memberAgentIds = agentIds.stream()
                 .filter(id -> !id.equals(orchestratorAgentId))
                 .collect(Collectors.toList());
-        writeClaudeMdFile(conv.getId(), orchestrator.getName(), buildOrchestratorClaudeMd(memberAgentIds));
-        for (Long agentId : memberAgentIds) {
-            AgentEntity memberAgent = agentMapper.selectById(agentId);
-            if (memberAgent != null) {
-                writeClaudeMdFile(conv.getId(), memberAgent.getName(), buildMemberClaudeMd(memberAgent));
-            }
-        }
 
-        return buildGroupResponse(conv, gc);
+        List<AgentEntity> memberAgents = agentMapper.selectBatchIds(memberAgentIds);
+
+        writeClaudeMdFile(conversationDbId, orchestrator.getName(), buildOrchestratorClaudeMd(memberAgents));
+        for (AgentEntity memberAgent : memberAgents) {
+            writeClaudeMdFile(conversationDbId, memberAgent.getName(), buildMemberClaudeMd(memberAgent));
+        }
     }
 
     private void addMemberInternal(Long conversationId, Long agentId, String role) {
