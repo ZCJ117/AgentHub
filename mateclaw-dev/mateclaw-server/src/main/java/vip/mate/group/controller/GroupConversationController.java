@@ -33,24 +33,13 @@ public class GroupConversationController {
             @RequestBody Map<String, Object> body) {
         String username = auth != null ? auth.getName() : "anonymous";
         String title = (String) body.getOrDefault("title", "Group Chat");
-        Long orchestratorId = body.get("orchestratorAgentId") != null
-            ? Long.valueOf(body.get("orchestratorAgentId").toString()) : null;
         List<Long> agentIds = safeConvertToLongList(body.get("agentIds"));
         String schedulingMode = (String) body.getOrDefault("schedulingMode", "auto");
         String failurePolicy = (String) body.getOrDefault("failurePolicy", "fail_tolerant");
         Integer maxParallel = body.get("maxParallelTasks") != null
             ? Integer.valueOf(body.get("maxParallelTasks").toString()) : 8;
         Map<String, Object> result = groupConversationService.createGroup(username, workspaceId, title,
-            orchestratorId, agentIds, schedulingMode, failurePolicy, maxParallel);
-        Long conversationDbId = Long.valueOf(result.get("conversationId").toString());
-        @SuppressWarnings("unchecked")
-        Map<String, Object> groupConfig = (Map<String, Object>) result.get("groupConfig");
-        Long actualOrchestratorId = Long.valueOf(groupConfig.get("orchestratorAgentId").toString());
-        try {
-            groupConversationService.generateClaudeMdFiles(conversationDbId, actualOrchestratorId, agentIds);
-        } catch (Exception e) {
-            log.warn("CLAUDE.md generation failed for group {}: {}", conversationDbId, e.getMessage());
-        }
+            agentIds, schedulingMode, failurePolicy, maxParallel);
         return R.ok(result);
     }
 

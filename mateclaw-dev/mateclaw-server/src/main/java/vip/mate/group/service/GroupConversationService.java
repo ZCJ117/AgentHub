@@ -18,7 +18,6 @@ import vip.mate.workspace.conversation.repository.ConversationMapper;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.io.File;
-import java.io.IOException;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -34,57 +33,6 @@ public class GroupConversationService {
     private static final String CLAUDE_MD_BASE_DIR =
             System.getProperty("java.io.tmpdir") + "/agenthub-claude-md";
 
-    /**
-     * Generate the Orchestrator's CLAUDE.md content with the agent list.
-     */
-    private String buildOrchestratorClaudeMd(List<AgentEntity> memberAgents) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("你是一个 Orchestrator 调度者。你的任务是根据用户的输入，为我提供的多个 Agent 分派任务。\n");
-        sb.append("你必须使用 \"@Agent名称\" 的形式来指派任务。\n");
-        sb.append("用户的消息可能直接是对全体说的，也可能是对特定 Agent 说的。\n");
-        sb.append("你需要解析用户意图，生成清晰的任务指令，并通过 \"@Agent名称: 具体任务描述\" 的方式，将子任务分发给对应的 Agent。\n");
-        sb.append("你不需要自己完成具体工作，你只负责分解、分配和协调。\n");
-        sb.append("如果用户没有明确指定 Agent，你要根据 Agent 的能力自行判断并分配。\n");
-        sb.append("在输出中，你对每个 Agent 的指派必须独占一行，格式严格为：@Agent名: 任务内容\n\n");
-        sb.append("可用 Agent 列表：\n\n");
-
-        for (AgentEntity ag : memberAgents) {
-            sb.append("· Agent名称: ").append(ag.getName()).append("\n");
-            sb.append("  能力: ").append(ag.getDescription() != null ? ag.getDescription() : "通用助手").append("\n");
-        }
-        return sb.toString();
-    }
-
-    /**
-     * Generate a member agent's CLAUDE.md content.
-     */
-    private String buildMemberClaudeMd(AgentEntity agent) {
-        return "你是 " + agent.getName() + "，你的角色是 " +
-                (agent.getDescription() != null ? agent.getDescription() : "通用助手") + "。\n" +
-                "你正在一个多 Agent 群聊中与其他 Agent 协作。\n" +
-                "对话中，当看到以 \"@" + agent.getName() + "\" 开头的消息时，那是指派给你的任务。\n" +
-                "你应当只回复与任务相关的内容，用第一人称的专家口吻。\n" +
-                "在回复时，先简要确认你收到了任务，然后给出你的专业意见或产出。\n" +
-                "不要模拟其他 Agent 的回复。\n";
-    }
-
-    /**
-     * Write CLAUDE.md content to a temp file. Returns the absolute path.
-     */
-    private String writeClaudeMdFile(Long conversationDbId, String agentName, String content) {
-        try {
-            File dir = new File(CLAUDE_MD_BASE_DIR + "/" + conversationDbId);
-            dir.mkdirs();
-            File file = new File(dir, sanitizeFilename(agentName) + ".md");
-            java.nio.file.Files.writeString(file.toPath(), content, java.nio.charset.StandardCharsets.UTF_8);
-            log.info("Generated CLAUDE.md for {} at {}", agentName, file.getAbsolutePath());
-            return file.getAbsolutePath();
-        } catch (IOException e) {
-            log.error("Failed to write CLAUDE.md for {}: {}", agentName, e.getMessage());
-            return null;
-        }
-    }
-
     private String sanitizeFilename(String name) {
         return name.replaceAll("[\\\\/:*?\"<>|]", "_");
     }
@@ -94,33 +42,21 @@ public class GroupConversationService {
      */
     @Transactional
     public Map<String, Object> createGroup(String username, Long workspaceId, String title,
-                                            Long orchestratorAgentId, List<Long> agentIds,
+                                            List<Long> agentIds,
                                             String schedulingMode, String failurePolicy, Integer maxParallelTasks) {
         if (agentIds == null || agentIds.size() < 2) {
             throw new MateClawException("err.group.min_agents", "群聊至少需要 2 个 Agent");
         }
 
-        if (orchestratorAgentId == null) {
-            orchestratorAgentId = findOrCreateDefaultOrchestrator(workspaceId);
-            log.info("Auto-assigned orchestratorAgentId={} for group chat", orchestratorAgentId);
-        }
+        // Orchestrator is now handled by arther-agent Agent01 (agents.yml "000001").
+        // No local_cli Orchestrator needed — the first user message in the group
+        // will be routed to Agent01 via ArtherAgentClient.
 
-        AgentEntity orchestrator = agentMapper.selectById(orchestratorAgentId);
-        if (orchestrator == null) {
-            throw new MateClawException("err.group.invalid_orchestrator", "指定的 Orchestrator Agent 不存在");
-        }
-        boolean validOrch = "orchestrator".equals(orchestrator.getAgentType())
-                || ("local_cli".equals(orchestrator.getAgentType())
-                    && "claude_code".equals(orchestrator.getCliType()));
-        if (!validOrch) {
-            throw new MateClawException("err.group.invalid_orchestrator",
-                    "Orchestrator 必须是 Claude Code 类型");
-        }
         // Create conversation
         ConversationEntity conv = new ConversationEntity();
         conv.setConversationId(UUID.randomUUID().toString());
         conv.setTitle(title);
-        conv.setAgentId(orchestratorAgentId);
+        conv.setAgentId(0L);  // group chat uses arther-agent orchestrator, no single agent
         conv.setUsername(username);
         conv.setMessageCount(0);
         conv.setConversationType("group");
@@ -133,7 +69,7 @@ public class GroupConversationService {
         // Create group config
         GroupConversationEntity gc = new GroupConversationEntity();
         gc.setConversationId(conv.getId());
-        gc.setOrchestratorAgentId(orchestratorAgentId);
+        gc.setOrchestratorAgentId(0L);  // orchestored by arther-agent Agent01
         gc.setSchedulingMode(schedulingMode != null ? schedulingMode : "auto");
         gc.setFailurePolicy(failurePolicy != null ? failurePolicy : "fail_tolerant");
         gc.setMaxParallelTasks(maxParallelTasks != null ? maxParallelTasks : 8);
@@ -141,40 +77,13 @@ public class GroupConversationService {
         gc.setUpdatedAt(LocalDateTime.now());
         groupConversationMapper.insert(gc);
 
-        // Add orchestrator as member
-        addMemberInternal(conv.getId(), orchestratorAgentId, "orchestrator");
+        // Agent01 from arther-agent acts as orchestrator (not a DB member)
         // Add other agents
         for (Long agentId : agentIds) {
-            if (!agentId.equals(orchestratorAgentId)) {
-                addMemberInternal(conv.getId(), agentId, "member");
-            }
+            addMemberInternal(conv.getId(), agentId, "member");
         }
 
         return buildGroupResponse(conv, gc);
-    }
-
-    /**
-     * Generate CLAUDE.md files for orchestrator and each member agent.
-     * This is intentionally NOT @Transactional — file I/O should not be inside a DB transaction.
-     * Call this AFTER createGroup() returns successfully.
-     */
-    public void generateClaudeMdFiles(Long conversationDbId, Long orchestratorAgentId, List<Long> agentIds) {
-        AgentEntity orchestrator = agentMapper.selectById(orchestratorAgentId);
-        if (orchestrator == null) {
-            log.warn("Orchestrator agent {} not found, skipping CLAUDE.md generation", orchestratorAgentId);
-            return;
-        }
-
-        List<Long> memberAgentIds = agentIds.stream()
-                .filter(id -> !id.equals(orchestratorAgentId))
-                .collect(Collectors.toList());
-
-        List<AgentEntity> memberAgents = agentMapper.selectBatchIds(memberAgentIds);
-
-        writeClaudeMdFile(conversationDbId, orchestrator.getName(), buildOrchestratorClaudeMd(memberAgents));
-        for (AgentEntity memberAgent : memberAgents) {
-            writeClaudeMdFile(conversationDbId, memberAgent.getName(), buildMemberClaudeMd(memberAgent));
-        }
     }
 
     private void addMemberInternal(Long conversationId, Long agentId, String role) {
@@ -370,37 +279,6 @@ public class GroupConversationService {
             }
         }
         return map;
-    }
-
-    /**
-     * Find the first enabled local_cli+claude_code agent, or create a default one.
-     */
-    private Long findOrCreateDefaultOrchestrator(Long workspaceId) {
-        Long wsId = workspaceId != null ? workspaceId : 1L;
-        List<AgentEntity> candidates = agentMapper.selectList(
-            new LambdaQueryWrapper<AgentEntity>()
-                .eq(AgentEntity::getWorkspaceId, wsId)
-                .eq(AgentEntity::getAgentType, "local_cli")
-                .eq(AgentEntity::getCliType, "claude_code")
-                .eq(AgentEntity::getEnabled, true)
-                .last("LIMIT 1"));
-        if (candidates != null && !candidates.isEmpty()) {
-            return candidates.get(0).getId();
-        }
-        AgentEntity orch = new AgentEntity();
-        orch.setName("默认Orchestrator");
-        orch.setDescription("自动创建的群聊协调Agent");
-        orch.setAgentType("local_cli");
-        orch.setCliType("claude_code");
-        orch.setWorkspaceId(wsId);
-        orch.setEnabled(true);
-        orch.setSystemPrompt("你是一个群聊协调者。使用 listAvailableAgents 查看可用Agent，使用 delegateToAgent 分派任务。请分析用户意图后将子任务分派给最合适的Agent执行。");
-        orch.setMaxIterations(100);
-        orch.setCreateTime(LocalDateTime.now());
-        orch.setUpdateTime(LocalDateTime.now());
-        agentMapper.insert(orch);
-        log.info("Auto-created default orchestrator agent id={} name={}", orch.getId(), orch.getName());
-        return orch.getId();
     }
 
     /**
