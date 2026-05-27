@@ -208,7 +208,7 @@ public class GroupConversationService {
         result.put("title", conv.getTitle());
         result.put("conversationType", conv.getConversationType());
         result.put("groupConfig", Map.of(
-            "orchestratorAgentId", gc.getOrchestratorAgentId(),
+            "orchestratorAgentId", gc.getOrchestratorAgentId() != null ? gc.getOrchestratorAgentId() : 0L,
             "schedulingMode", gc.getSchedulingMode(),
             "failurePolicy", gc.getFailurePolicy(),
             "maxParallelTasks", gc.getMaxParallelTasks()
@@ -296,7 +296,7 @@ public class GroupConversationService {
                         .eq(GroupConversationEntity::getConversationId, conversationDbId));
         if (gc == null) return null;
         return Map.of(
-                "orchestratorAgentId", gc.getOrchestratorAgentId(),
+                "orchestratorAgentId", gc.getOrchestratorAgentId() != null ? gc.getOrchestratorAgentId() : 0L,
                 "schedulingMode", gc.getSchedulingMode(),
                 "failurePolicy", gc.getFailurePolicy(),
                 "maxParallelTasks", gc.getMaxParallelTasks()
