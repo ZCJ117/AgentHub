@@ -402,4 +402,26 @@ public class GroupConversationService {
         log.info("Auto-created default orchestrator agent id={} name={}", orch.getId(), orch.getName());
         return orch.getId();
     }
+
+    /**
+     * Get the group configuration for a conversation by its database primary key.
+     * Returns a map with orchestratorAgentId, schedulingMode, failurePolicy,
+     * and maxParallelTasks. Returns null if the conversation is not a group chat.
+     *
+     * <p>根据会话数据库主键获取群聊配置。返回包含 orchestratorAgentId、
+     * schedulingMode、failurePolicy、maxParallelTasks 的 Map。
+     * 若不是群聊则返回 null。
+     */
+    public Map<String, Object> getGroupConfig(Long conversationDbId) {
+        GroupConversationEntity gc = groupConversationMapper.selectOne(
+                new LambdaQueryWrapper<GroupConversationEntity>()
+                        .eq(GroupConversationEntity::getConversationId, conversationDbId));
+        if (gc == null) return null;
+        return Map.of(
+                "orchestratorAgentId", gc.getOrchestratorAgentId(),
+                "schedulingMode", gc.getSchedulingMode(),
+                "failurePolicy", gc.getFailurePolicy(),
+                "maxParallelTasks", gc.getMaxParallelTasks()
+        );
+    }
 }

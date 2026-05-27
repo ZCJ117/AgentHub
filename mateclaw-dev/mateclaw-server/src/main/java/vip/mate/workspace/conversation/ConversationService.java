@@ -1314,6 +1314,21 @@ public class ConversationService {
     }
 
     /**
+     * Resolve the full entity by its string conversationId (for metadata such
+     * as conversationType, workspaceId, etc.). Returns null when no matching
+     * non-deleted row exists.
+     *
+     * <p>通过字符串 conversationId 获取完整实体。用于读取 conversationType
+     * 等元数据。若无匹配的未删除行则返回 null。
+     */
+    public ConversationEntity getByConversationId(String conversationId) {
+        return conversationMapper.selectOne(
+            new LambdaQueryWrapper<ConversationEntity>()
+                .eq(ConversationEntity::getConversationId, conversationId)
+                .eq(ConversationEntity::getDeleted, 0));
+    }
+
+    /**
      * Check whether a conversation row exists.
      *
      * <p>检查会话是否存在。
