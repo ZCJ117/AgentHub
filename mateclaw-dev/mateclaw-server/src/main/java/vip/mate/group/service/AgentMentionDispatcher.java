@@ -42,6 +42,9 @@ public class AgentMentionDispatcher {
     /** Track active agent streams per conversation to avoid duplicate spawns */
     private final Map<String, Map<String, Boolean>> dispatchedAgents = new ConcurrentHashMap<>();
 
+    /** Track active virtual threads so they can be interrupted on abort */
+    private final Map<String, Thread> activeThreads = new ConcurrentHashMap<>();
+
     /**
      * Test a complete line against the @AgentName pattern.
      * If matched, spawn the agent and stream its response.
@@ -86,7 +89,7 @@ public class AgentMentionDispatcher {
         ));
 
         // Run agent in a virtual thread so orchestrator stream is not blocked
-        Thread.startVirtualThread(() -> {
+        Thread vt = Thread.startVirtualThread(() -> {
             try {
                 if (!semaphore.tryAcquire(180, TimeUnit.SECONDS)) {
                     log.warn("[Dispatcher] Semaphore timeout for agent={}", agentName);
@@ -101,9 +104,11 @@ public class AgentMentionDispatcher {
             try {
                 spawnAndStreamAgent(agent, agentName, task, claudeMdPath, conversationId);
             } finally {
+                activeThreads.remove(conversationId + ":" + agentName);
                 semaphore.release();
             }
         });
+        activeThreads.put(conversationId + ":" + agentName, vt);
 
         return true;
     }
@@ -153,7 +158,11 @@ public class AgentMentionDispatcher {
                     try {
                         var msg = conversationService.saveMessage(conversationId, "assistant", responseText);
                         msg.setSenderAgentId(agent.getId());
-                        messageMapper.updateById(msg);
+                        try {
+                            messageMapper.updateById(msg);
+                        } catch (Exception e) {
+                            log.error("[Dispatcher] Failed to set senderAgentId on message {}: {}", msg.getId(), e.getMessage());
+                        }
                     } catch (Exception e) {
                         log.error("[Dispatcher] Failed to save message for agent={}: {}", agentName, e.getMessage());
                     }
@@ -188,9 +197,14 @@ public class AgentMentionDispatcher {
 
     /** Reset dispatch tracking for a new turn */
     public void resetForTurn(String conversationId) {
-        Map<String, Boolean> convDispatched = dispatchedAgents.get(conversationId);
-        if (convDispatched != null) {
-            convDispatched.clear();
-        }
+        dispatchedAgents.remove(conversationId);
+        // Interrupt any active dispatch threads for this conversation
+        String prefix = conversationId + ":";
+        activeThreads.forEach((key, thread) -> {
+            if (key.startsWith(prefix)) {
+                thread.interrupt();
+            }
+        });
+        activeThreads.entrySet().removeIf(e -> e.getKey().startsWith(prefix));
     }
 }
