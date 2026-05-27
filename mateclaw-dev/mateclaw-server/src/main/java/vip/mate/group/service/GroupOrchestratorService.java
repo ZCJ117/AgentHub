@@ -39,9 +39,8 @@ public class GroupOrchestratorService {
         String apiKey = (String) aiApi.get("api-key");
         this.model = (String) chatModel.get("model");
 
-        // Agent01's instruction is the system prompt
-        Map<String, Object> agents = (Map<String, Object>) config.get("agents");
-        var agentList = (List<Map<String, String>>) agents.get("agents");
+        // Agent01's instruction is the system prompt (module.agents[0].instruction)
+        var agentList = (List<Map<String, String>>) module.get("agents");
         this.systemPrompt = agentList != null && !agentList.isEmpty()
                 ? agentList.get(0).get("instruction")
                 : "";
