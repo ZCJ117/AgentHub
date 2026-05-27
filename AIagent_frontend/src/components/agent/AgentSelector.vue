@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { NModal, NAvatar, NTag, NCheckbox, NButton, NInput, NSelect, NSpace, NRadio, NRadioGroup } from 'naive-ui'
+import { NModal, NAvatar, NTag, NCheckbox, NButton, NInput, NSpace, NRadio, NRadioGroup } from 'naive-ui'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -13,12 +13,6 @@ const emit = defineEmits(['close', 'create'])
 const selectedAgentId = ref(null)
 const selectedAgentIds = ref([])
 const groupTitle = ref('')
-const orchestratorAgentId = ref(null)
-
-const orchestratorCandidates = computed(() =>
-  props.agents.filter(a => a.cliType === 'claude_code')
-)
-
 const availableMembers = computed(() =>
   props.agents.filter(a => a.agentType !== 'orchestrator' && a.enabled !== false)
 )
@@ -34,14 +28,14 @@ function parseTags(tags) {
 function handleCreate() {
   if (props.mode === 'direct') {
     if (!selectedAgentId.value) return
-    emit('create', { agentId: selectedAgentId.value, mode: 'direct' })
+    console.log('[AgentSelector] create direct chat, agentId:', selectedAgentId.value)
+    emit('create', { agentId: Number(selectedAgentId.value), mode: 'direct' })
   } else {
     if (selectedAgentIds.value.length < 2) return
     emit('create', {
       mode: 'group',
       title: groupTitle.value,
-      agentIds: selectedAgentIds.value,
-      orchestratorAgentId: orchestratorAgentId.value || (orchestratorCandidates.value[0]?.id),
+      agentIds: selectedAgentIds.value.map(id => Number(id)),
       schedulingMode: 'auto',
       failurePolicy: 'fail_tolerant',
       maxParallelTasks: 4
@@ -111,17 +105,6 @@ function close() {
               {{ tag }}
             </NTag>
           </div>
-        </div>
-
-        <div class="group-config" style="margin-top: 12px">
-          <NSpace vertical :size="8">
-            <NSelect
-              v-model:value="orchestratorAgentId"
-              :options="orchestratorCandidates.map(a => ({ label: a.name, value: a.id }))"
-              placeholder="选择 Orchestrator (可选)"
-              clearable
-            />
-          </NSpace>
         </div>
       </div>
 

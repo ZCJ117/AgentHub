@@ -2,12 +2,14 @@
 import { ref, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
+import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSpin } from 'naive-ui'
 import AgentSelector from '@/components/agent/AgentSelector.vue'
 
 const router = useRouter()
 const convStore = useConversationStore()
+const chatStore = useChatStore()
 const agentStore = useAgentStore()
 
 const showAgentSelector = ref(false)
@@ -32,15 +34,17 @@ function newDirectChat() {
 }
 
 async function handleCreateConversation(config) {
+  console.log('[Sidebar] handleCreateConversation config:', config)
   showAgentSelector.value = false
   if (config.mode === 'direct') {
-    router.push('/chat')
     agentStore.selectAgent(config.agentId)
+    convStore.setActive(null)
+    chatStore.clearMessages()
+    router.replace('/chat')
   } else {
     try {
       const result = await convStore.createGroup({
         title: config.title,
-        orchestratorAgentId: config.orchestratorAgentId,
         agentIds: config.agentIds,
         schedulingMode: config.schedulingMode,
         failurePolicy: config.failurePolicy,
