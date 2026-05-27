@@ -256,6 +256,15 @@ public class ConversationService {
         ConversationEntity conv = conversationMapper.selectOne(new LambdaQueryWrapper<ConversationEntity>()
                 .eq(ConversationEntity::getConversationId, conversationId));
         if (conv == null) {
+            // Fallback: try lookup by DB primary key (frontend may send numeric ID)
+            try {
+                Long id = Long.parseLong(conversationId);
+                conv = conversationMapper.selectById(id);
+            } catch (NumberFormatException ignored) {
+                // Not a numeric ID, will create new below
+            }
+        }
+        if (conv == null) {
             conv = new ConversationEntity();
             conv.setConversationId(conversationId);
             conv.setAgentId(agentId);

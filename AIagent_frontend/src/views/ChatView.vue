@@ -10,7 +10,7 @@ import { interruptChat } from '@/api/chat'
 import { pinMessage, unpinMessage } from '@/api/conversations'
 import { fetchReplyChain } from '@/api/messages'
 import { renderMarkdown } from '@/composables/useMarkdown'
-import { NModal, NTimeLine, NTimeLineItem } from 'naive-ui'
+import { NModal, NTimeline, NTimelineItem } from 'naive-ui'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
 import ChatArea from '@/components/chat/ChatArea.vue'
 import TopBar from '@/components/layout/TopBar.vue'
@@ -45,12 +45,16 @@ watch(
 )
 
 function getEffectiveAgentId() {
+  if (convStore.activeConversation?.conversationType === 'group') {
+    return null  // Group chat uses arther-agent Orchestrator, no single agent
+  }
   return convStore.activeConversation?.agentId || agentStore.selectedAgentId
 }
 
 function handleSendMessage(text) {
+  const isGroupChat = convStore.activeConversation?.conversationType === 'group'
   const agentId = getEffectiveAgentId()
-  if (!agentId) {
+  if (!agentId && !isGroupChat) {
     if (agentStore.agents.length > 0) {
       agentStore.selectAgent(agentStore.agents[0].id)
       chatStore.sendMessage(text, agentStore.agents[0].id)
@@ -195,20 +199,20 @@ function formatTimestamp(ts) {
       />
     </div>
     <DetailPanel @unpin-message="handleUnpinMessage" />
-  </div>
 
     <NModal v-model:show="showReplyChain" preset="card" title="回复链" style="max-width:560px">
-      <NTimeLine>
-        <NTimeLineItem
+      <NTimeline>
+        <NTimelineItem
           v-for="item in replyChain"
           :key="item.id"
           :title="(item.senderAgentName || '你') + ' · ' + formatTimestamp(item.createdAt || item.createTime)"
           :color="item.role === 'user' ? '#1a73e8' : '#34a853'"
         >
           <div v-html="renderMarkdown((item.content || '').slice(0, 300))" />
-        </NTimeLineItem>
-      </NTimeLine>
+        </NTimelineItem>
+      </NTimeline>
     </NModal>
+  </div>
 </template>
 
 <style scoped>

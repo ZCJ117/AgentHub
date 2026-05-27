@@ -607,10 +607,12 @@ public class ChatController {
                 conversationService.saveMessage(conversationId, "user", message, requestParts);
                 conversationService.updateStreamStatus(conversationId, "running");
 
-                broadcastEvent(conversationId, "session", Map.of(
-                        "conversationId", conversationId,
-                        "agentId", agentId
-                ));
+                {
+                    Map<String, Object> sessionData = new LinkedHashMap<>();
+                    sessionData.put("conversationId", conversationId);
+                    if (agentId != null) sessionData.put("agentId", agentId);
+                    broadcastEvent(conversationId, "session", sessionData);
+                }
                 broadcastEvent(conversationId, "message_start", Map.of(
                         "role", "assistant"
                 ));
