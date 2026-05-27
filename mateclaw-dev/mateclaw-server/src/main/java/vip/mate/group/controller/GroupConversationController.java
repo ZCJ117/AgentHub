@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import vip.mate.common.result.R;
@@ -15,6 +16,7 @@ import java.util.Map;
 /**
  * 群聊会话管理接口 — API 文档 6.
  */
+@Slf4j
 @Tag(name = "群聊会话管理")
 @RestController
 @RequestMapping("/api/v1/conversations/group")
@@ -44,7 +46,11 @@ public class GroupConversationController {
         @SuppressWarnings("unchecked")
         Map<String, Object> groupConfig = (Map<String, Object>) result.get("groupConfig");
         Long actualOrchestratorId = Long.valueOf(groupConfig.get("orchestratorAgentId").toString());
-        groupConversationService.generateClaudeMdFiles(conversationDbId, actualOrchestratorId, agentIds);
+        try {
+            groupConversationService.generateClaudeMdFiles(conversationDbId, actualOrchestratorId, agentIds);
+        } catch (Exception e) {
+            log.warn("CLAUDE.md generation failed for group {}: {}", conversationDbId, e.getMessage());
+        }
         return R.ok(result);
     }
 
