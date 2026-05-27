@@ -56,7 +56,7 @@ public class GroupConversationService {
         ConversationEntity conv = new ConversationEntity();
         conv.setConversationId(UUID.randomUUID().toString());
         conv.setTitle(title);
-        conv.setAgentId(0L);  // group chat uses arther-agent orchestrator, no single agent
+        conv.setAgentId(null);  // group chat uses arther-agent orchestrator, no single agent
         conv.setUsername(username);
         conv.setMessageCount(0);
         conv.setConversationType("group");
@@ -69,7 +69,7 @@ public class GroupConversationService {
         // Create group config
         GroupConversationEntity gc = new GroupConversationEntity();
         gc.setConversationId(conv.getId());
-        gc.setOrchestratorAgentId(0L);  // orchestored by arther-agent Agent01
+        gc.setOrchestratorAgentId(null);  // Orchestrator is external (arther-agent Agent01)
         gc.setSchedulingMode(schedulingMode != null ? schedulingMode : "auto");
         gc.setFailurePolicy(failurePolicy != null ? failurePolicy : "fail_tolerant");
         gc.setMaxParallelTasks(maxParallelTasks != null ? maxParallelTasks : 8);
