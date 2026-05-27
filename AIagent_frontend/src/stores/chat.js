@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { streamChat, stopChat, interruptChat } from '@/api/chat'
 import { fetchMessages } from '@/api/conversations'
 import { addReaction, removeReaction, fetchReactions, regenerateMessage } from '@/api/messages'
 import { useAuthStore } from '@/stores/auth'
+import { useConversationStore } from '@/stores/conversation'
 import { useSSE } from '@/composables/useSSE'
 import { useOrchestratorStore } from '@/stores/orchestrator'
 import { useArtifactStore } from '@/stores/artifact'
@@ -24,6 +26,9 @@ export const useChatStore = defineStore('chat', () => {
   const messageReactionsMap = ref(new Map())
   const pendingReactions = ref(new Set())
   const replyTo = ref(null) // { id, preview, senderName } | null
+
+  // Multi-agent group chat: maps agentName → local message id
+  const agentStreams = ref(new Map())
 
   function setReplyTo(msg) {
     replyTo.value = {
@@ -96,6 +101,7 @@ export const useChatStore = defineStore('chat', () => {
   async function initConversation(convId) {
     conversationId.value = convId
     replyTo.value = null
+    agentStreams.value.clear()
     messages.value = []
     messageReactionsMap.value.clear()
 
@@ -130,10 +136,13 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function sendMessage(text, agentId, options = {}) {
-    if (!text.trim() || isStreaming.value) return
+    console.log('[chatStore] sendMessage called, text:', text, 'agentId:', agentId, 'isStreaming:', isStreaming.value)
+    if (!text.trim() || isStreaming.value) {
+      console.log('[chatStore] sendMessage blocked — empty text or already streaming')
+      return
+    }
 
     streamError.value = ''
-
     addMessageLocal('user', text, { replyToId: replyTo.value?.id || null })
 
     const assistantId = addMessageLocal('assistant', '', { status: 'streaming' })
@@ -142,10 +151,50 @@ export const useChatStore = defineStore('chat', () => {
 
     sse = useSSE()
 
-    sse.on('text', (data) => {
-      const msg = messages.value.find(m => m.id === assistantId)
-      if (msg) {
-        updateMessage(assistantId, { content: (msg.content || '') + (data.delta || '') })
+    // ── Safety timeouts: prevent UI from getting stuck if SSE drops ──
+    let contentReceived = false
+    const NO_CONTENT_TIMEOUT = 30_000   // 30s without any content delta
+    const MAX_STREAM_TIME = 90_000      // 90s total max
+
+    let contentTimeoutId = setTimeout(() => {
+      if (!contentReceived && isStreaming.value) {
+        streamError.value = 'Agent 响应超时，请重试'
+        updateMessage(assistantId, { status: 'error' })
+        isStreaming.value = false
+        sse.disconnect()
+      }
+    }, NO_CONTENT_TIMEOUT)
+
+    const maxTimeId = setTimeout(() => {
+      if (isStreaming.value) {
+        updateMessage(assistantId, { status: 'completed' })
+        isStreaming.value = false
+        sse.disconnect()
+      }
+    }, MAX_STREAM_TIME)
+
+    // Backend broadcasts content as "content_delta" events
+    sse.on('content_delta', (data) => {
+      contentReceived = true
+      clearTimeout(contentTimeoutId)
+      contentTimeoutId = setTimeout(() => {
+        if (isStreaming.value) {
+          streamError.value = 'Agent 响应超时，请重试'
+          updateMessage(assistantId, { status: 'error' })
+          isStreaming.value = false
+          sse.disconnect()
+        }
+      }, NO_CONTENT_TIMEOUT)
+
+      // Route to correct agent bubble in group chat, or orchestrator otherwise
+      const targetId = data.agentName
+        ? agentStreams.value.get(data.agentName)
+        : assistantId
+      if (targetId) {
+        const msg = messages.value.find(m => m.id === targetId)
+        if (msg) {
+          updateMessage(targetId, { content: (msg.content || '') + String(data.delta || '') })
+        }
       }
     })
 
@@ -203,21 +252,108 @@ export const useChatStore = defineStore('chat', () => {
       }
     })
 
-    sse.on('done', (data) => {
-      updateMessage(assistantId, {
+    sse.on('agent_message_start', (data) => {
+      const agentId = addMessageLocal('assistant', '', {
+        status: 'streaming',
+        senderAgentName: data.agentName,
+        senderAgentId: data.agentId
+      })
+      agentStreams.value.set(data.agentName, agentId)
+    })
+
+    sse.on('agent_message_complete', (data) => {
+      const agentId = agentStreams.value.get(data.agentName)
+      if (agentId) {
+        updateMessage(agentId, {
+          status: data.status === 'error' ? 'error' : 'completed'
+        })
+        agentStreams.value.delete(data.agentName)
+      }
+    })
+
+    sse.on('session', (data) => {
+      if (data.conversationId) {
+        conversationId.value = data.conversationId
+      }
+    })
+
+    sse.on('done', async (data) => {
+      doneReceived = true
+      clearTimeout(contentTimeoutId)
+      clearTimeout(maxTimeId)
+
+      // Replace local message ID with server-assigned ID
+      const serverMsgId = data.assistantMessageId ? String(data.assistantMessageId) : null
+      if (serverMsgId) {
+        const idx = messages.value.findIndex(m => m.id === assistantId)
+        if (idx !== -1) {
+          messages.value[idx] = { ...messages.value[idx], id: serverMsgId }
+        }
+      }
+
+      updateMessage(serverMsgId || assistantId, {
         status: 'completed',
         tokenUsage: data.tokenUsage || null
       })
+
+      // Fallback: if content_delta events were lost, use the full
+      // content from the done payload so the bubble isn't blank
+      if (data.content) {
+        const msg = messages.value.find(m => m.id === (serverMsgId || assistantId))
+        if (msg && (!msg.content || msg.content.trim() === '')) {
+          updateMessage(serverMsgId || assistantId, { content: data.content })
+        }
+      }
+
       currentTurnId.value = data.turnId || null
       isStreaming.value = false
       sse.disconnect()
+
+      // Reload conversation list so new conversation appears in sidebar
+      const convStore = useConversationStore()
+      await convStore.loadList()
+
+      // Navigate to conversation page if we have a valid ID
+      if (conversationId.value) {
+        const conv = convStore.conversations.find(
+          c => String(c.conversationId) === String(conversationId.value)
+        )
+        if (conv) {
+          const router = useRouter()
+          router.replace(`/chat/${conv.id}`)
+        }
+      }
     })
 
     sse.on('error', (data) => {
+      clearTimeout(contentTimeoutId)
+      clearTimeout(maxTimeId)
       streamError.value = data.message || 'Stream error'
       updateMessage(assistantId, { status: 'error' })
       isStreaming.value = false
       sse.disconnect()
+    })
+
+    // ── Lifecycle event handlers (backend emits these for observability) ──
+    sse.on('thinking_delta', () => {})
+    sse.on('stream_started', () => {})
+    sse.on('message_start', () => {})
+    sse.on('turn_interrupted', () => {})
+
+    // Fallback: if message_complete arrives but done is lost, auto-complete after 3s
+    let doneReceived = false
+    sse.on('message_complete', (data) => {
+      if (data.status === 'completed' || data.status === 'stopped') {
+        setTimeout(() => {
+          if (!doneReceived && isStreaming.value) {
+            updateMessage(assistantId, { status: 'completed' })
+            isStreaming.value = false
+            sse.disconnect()
+            clearTimeout(contentTimeoutId)
+            clearTimeout(maxTimeId)
+          }
+        }, 3000)
+      }
     })
 
     sse.connect((signal) => streamChat({
@@ -284,8 +420,10 @@ export const useChatStore = defineStore('chat', () => {
 
   function clearMessages() {
     messages.value = []
+    conversationId.value = null
     messageReactionsMap.value.clear()
     replyTo.value = null
+    agentStreams.value.clear()
     streamError.value = ''
     if (sse) sse.disconnect()
     isStreaming.value = false
@@ -298,6 +436,7 @@ export const useChatStore = defineStore('chat', () => {
     handleReaction, handleRegenerate, clearMessages,
     addMessageLocal, updateMessage,
     messageReactionsMap, pendingReactions, loadReactions, getReactions,
-    replyTo, setReplyTo, clearReplyTo
+    replyTo, setReplyTo, clearReplyTo,
+    agentStreams
   }
 })
