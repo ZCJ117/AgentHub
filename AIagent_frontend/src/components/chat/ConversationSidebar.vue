@@ -23,7 +23,8 @@ watch(() => convStore.filter, () => {
   convStore.loadList()
 })
 
-function selectConversation(id) {
+function selectConversation(idOrConv) {
+  const id = typeof idOrConv === 'object' ? (idOrConv.conversationId || idOrConv.id) : idOrConv
   convStore.setActive(id)
   router.push(`/chat/${id}`)
 }
@@ -151,7 +152,7 @@ function handleContextMenu(key, conv) {
             active: conv.id === convStore.activeId,
             pinned: conv.pinnedAt
           }"
-          @click="selectConversation(conv.id)"
+          @click="selectConversation(conv)"
         >
           <div class="conv-content">
             <NAvatar

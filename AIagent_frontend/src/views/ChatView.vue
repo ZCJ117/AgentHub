@@ -34,7 +34,7 @@ provide('scrollToMessage', (messageId) => {
 watch(
   () => route.params.conversationId,
   async (id) => {
-    const convId = id ? Number(id) : null
+    const convId = id || null
     convStore.setActive(convId)
     await chatStore.initConversation(convId)
     if (convId) {

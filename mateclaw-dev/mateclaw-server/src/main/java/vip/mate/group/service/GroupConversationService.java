@@ -204,7 +204,7 @@ public class GroupConversationService {
         }).collect(Collectors.toList());
 
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("conversationId", conv.getId());
+        result.put("conversationId", conv.getConversationId());
         result.put("title", conv.getTitle());
         result.put("conversationType", conv.getConversationType());
         result.put("groupConfig", Map.of(

@@ -298,7 +298,8 @@ mate:
       trust-half-life-days: 60
       forget-enabled: true
 
-# arther-agent engine base URL for Orchestrator calls
-arther:
+# arther-agent engine — in-process orchestrator config
+ai:
   agent:
-    base-url: http://127.0.0.1:8091
+    config:
+      enabled: true
