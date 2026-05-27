@@ -24,7 +24,7 @@ import vip.mate.approval.ResolveOutcome;
 import vip.mate.memory.event.ConversationCompletionPublisher;
 import vip.mate.group.service.AgentMentionDispatcher;
 import vip.mate.group.service.GroupConversationService;
-import vip.mate.group.service.OrchestratorService;
+import vip.mate.group.service.GroupOrchestratorService;
 import vip.mate.workspace.conversation.ConversationService;
 import vip.mate.workspace.conversation.model.MessageContentPart;
 import vip.mate.workspace.conversation.model.MessageEntity;
@@ -68,7 +68,7 @@ public class ChatController {
     private final ConversationCompletionPublisher completionPublisher;
     private final GroupConversationService groupConversationService;
     private final AgentMentionDispatcher mentionDispatcher;
-    private final OrchestratorService orchestratorService;
+    private final GroupOrchestratorService groupOrchestratorService;
     private final Path uploadRoot = Paths.get("data", "chat-uploads");
 
     // 使用虚拟线程池处理 SSE（Java 17+ 兼容，Java 21 可用 Executors.newVirtualThreadPerTaskExecutor()）
@@ -661,11 +661,11 @@ public class ChatController {
                 if (isGroupChat && agentNameMap != null && convDbId != null) {
                     // ── Group chat: use arther-agent Agent01 as Orchestrator ──
                     List<AgentEntity> memberAgents = new ArrayList<>(agentNameMap.values());
-                    String orchPrompt = orchestratorService.buildOrchestratorPrompt(memberAgents, message);
+                    String orchPrompt = groupOrchestratorService.buildOrchestratorPrompt(memberAgents, message);
 
                     mentionDispatcher.resetForTurn(convId);
 
-                    agentFlux = orchestratorService.callOrchestrator(username, orchPrompt)
+                    agentFlux = groupOrchestratorService.callOrchestrator(username, orchPrompt)
                             .map(text -> {
                                 // Feed text through line buffer for @AgentName detection
                                 for (int i = 0; i < text.length(); i++) {

@@ -18,8 +18,8 @@ import java.util.Map;
  * a separate arther-agent process on port 8091.
  */
 @Slf4j
-@Service
-public class OrchestratorService {
+@Service("groupOrchestratorService")
+public class GroupOrchestratorService {
 
     private final WebClient webClient;
     private final String model;
@@ -29,7 +29,7 @@ public class OrchestratorService {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     @SuppressWarnings("unchecked")
-    public OrchestratorService() {
+    public GroupOrchestratorService() {
         Map<String, Object> config = loadAgentConfig();
         Map<String, Object> module = (Map<String, Object>) config.get("module");
         Map<String, Object> aiApi = (Map<String, Object>) module.get("ai-api");
@@ -52,7 +52,7 @@ public class OrchestratorService {
                 .defaultHeader("Content-Type", "application/json")
                 .build();
 
-        log.info("OrchestratorService initialized: model={}, baseUrl={}", model, baseUrl);
+        log.info("GroupOrchestratorService initialized: model={}, baseUrl={}", model, baseUrl);
     }
 
     @SuppressWarnings("unchecked")
