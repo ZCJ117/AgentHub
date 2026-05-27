@@ -23,6 +23,7 @@ import vip.mate.approval.PendingApproval;
 import vip.mate.approval.ResolveOutcome;
 import vip.mate.memory.event.ConversationCompletionPublisher;
 import vip.mate.group.service.AgentMentionDispatcher;
+import vip.mate.group.client.ArtherAgentClient;
 import vip.mate.group.service.GroupConversationService;
 import vip.mate.workspace.conversation.ConversationService;
 import vip.mate.workspace.conversation.model.MessageContentPart;
@@ -35,6 +36,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
 import reactor.core.Disposable;
+import reactor.core.publisher.Flux;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -66,6 +68,7 @@ public class ChatController {
     private final ConversationCompletionPublisher completionPublisher;
     private final GroupConversationService groupConversationService;
     private final AgentMentionDispatcher mentionDispatcher;
+    private final ArtherAgentClient artherAgentClient;
     private final Path uploadRoot = Paths.get("data", "chat-uploads");
 
     // 使用虚拟线程池处理 SSE（Java 17+ 兼容，Java 21 可用 Executors.newVirtualThreadPerTaskExecutor()）
@@ -651,32 +654,81 @@ public class ChatController {
                 final Long convDbId = isGroupChat ? conversationDbId : null;
                 final String convId = conversationId;  // effectively final copy for lambda
 
-                var agentFlux = agentService.chatStructuredStream(agentId, promptText, conversationId, username, request.getThinkingLevel(), webOrigin);
+                Flux<AgentService.StreamDelta> agentFlux;
 
                 if (isGroupChat && agentNameMap != null && convDbId != null) {
+                    // ── Group chat: use arther-agent Agent01 as Orchestrator ──
+                    List<AgentEntity> memberAgents = new ArrayList<>(agentNameMap.values());
+                    String orchPrompt = artherAgentClient.buildOrchestratorPrompt(memberAgents, message);
+
                     mentionDispatcher.resetForTurn(convId);
-                    agentFlux = agentFlux.doOnNext(delta -> {
-                        if (delta.content() != null) {
-                            String text = delta.content();
-                            for (int i = 0; i < text.length(); i++) {
-                                char c = text.charAt(i);
-                                if (c == '\n') {
-                                    String line = lineBuffer.toString();
-                                    lineBuffer.setLength(0);
+
+                    agentFlux = artherAgentClient.callOrchestrator(username, orchPrompt)
+                            .map(sseLine -> {
+                                String text = ArtherAgentClient.extractTextFromSseLine(sseLine);
+                                if (text != null) {
+                                    // Feed text through line buffer for @AgentName detection
+                                    for (int i = 0; i < text.length(); i++) {
+                                        char c = text.charAt(i);
+                                        if (c == '\n') {
+                                            String line = lineBuffer.toString();
+                                            lineBuffer.setLength(0);
+                                            mentionDispatcher.dispatchIfComplete(convDbId, convId,
+                                                    agentNameMap, line, groupSemaphore);
+                                        } else {
+                                            lineBuffer.append(c);
+                                        }
+                                    }
+                                    // Return content as StreamDelta for broadcast
+                                    return new AgentService.StreamDelta(text, null);
+                                }
+                                // Non-textDelta events (toolCall, toolResult, etc.)
+                                // Don't broadcast empty content to frontend
+                                return new AgentService.StreamDelta("", null);
+                            })
+                            .doOnComplete(() -> {
+                                // Flush remaining buffer on stream completion
+                                if (lineBuffer.length() > 0) {
                                     mentionDispatcher.dispatchIfComplete(convDbId, convId,
-                                            agentNameMap, line, groupSemaphore);
-                                } else {
-                                    lineBuffer.append(c);
+                                            agentNameMap, lineBuffer.toString(), groupSemaphore);
+                                }
+                            })
+                            .doOnError(err -> {
+                                log.error("arther-agent orchestrator stream failed for group {}: {}",
+                                        convId, err.getMessage());
+                                broadcastEvent(convId, "error", Map.of(
+                                        "message", "Orchestrator 服务不可用: " + err.getMessage()
+                                ));
+                            });
+                } else {
+                    // ── Direct / non-group chat: use existing agent stream ──
+                    agentFlux = agentService.chatStructuredStream(agentId, promptText, conversationId,
+                            username, request.getThinkingLevel(), webOrigin);
+
+                    if (isGroupChat && agentNameMap != null && convDbId != null) {
+                        mentionDispatcher.resetForTurn(convId);
+                        agentFlux = agentFlux.doOnNext(delta -> {
+                            if (delta.content() != null) {
+                                String text = delta.content();
+                                for (int i = 0; i < text.length(); i++) {
+                                    char c = text.charAt(i);
+                                    if (c == '\n') {
+                                        String line = lineBuffer.toString();
+                                        lineBuffer.setLength(0);
+                                        mentionDispatcher.dispatchIfComplete(convDbId, convId,
+                                                agentNameMap, line, groupSemaphore);
+                                    } else {
+                                        lineBuffer.append(c);
+                                    }
                                 }
                             }
-                        }
-                    }).doOnComplete(() -> {
-                        // Flush remaining buffer on stream completion
-                        if (lineBuffer.length() > 0) {
-                            mentionDispatcher.dispatchIfComplete(convDbId, convId,
-                                    agentNameMap, lineBuffer.toString(), groupSemaphore);
-                        }
-                    });
+                        }).doOnComplete(() -> {
+                            if (lineBuffer.length() > 0) {
+                                mentionDispatcher.dispatchIfComplete(convDbId, convId,
+                                        agentNameMap, lineBuffer.toString(), groupSemaphore);
+                            }
+                        });
+                    }
                 }
 
                 Disposable disposable = agentFlux
