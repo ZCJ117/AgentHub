@@ -704,31 +704,6 @@ public class ChatController {
                     // ── Direct / non-group chat: use existing agent stream ──
                     agentFlux = agentService.chatStructuredStream(agentId, promptText, conversationId,
                             username, request.getThinkingLevel(), webOrigin);
-
-                    if (isGroupChat && agentNameMap != null && convDbId != null) {
-                        mentionDispatcher.resetForTurn(convId);
-                        agentFlux = agentFlux.doOnNext(delta -> {
-                            if (delta.content() != null) {
-                                String text = delta.content();
-                                for (int i = 0; i < text.length(); i++) {
-                                    char c = text.charAt(i);
-                                    if (c == '\n') {
-                                        String line = lineBuffer.toString();
-                                        lineBuffer.setLength(0);
-                                        mentionDispatcher.dispatchIfComplete(convDbId, convId,
-                                                agentNameMap, line, groupSemaphore);
-                                    } else {
-                                        lineBuffer.append(c);
-                                    }
-                                }
-                            }
-                        }).doOnComplete(() -> {
-                            if (lineBuffer.length() > 0) {
-                                mentionDispatcher.dispatchIfComplete(convDbId, convId,
-                                        agentNameMap, lineBuffer.toString(), groupSemaphore);
-                            }
-                        });
-                    }
                 }
 
                 Disposable disposable = agentFlux
