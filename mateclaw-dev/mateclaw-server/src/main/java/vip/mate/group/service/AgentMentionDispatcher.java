@@ -175,13 +175,26 @@ public class AgentMentionDispatcher {
                 ));
                 processManager.terminate(agentIdStr);
                 log.info("[Dispatcher] Agent {} completed, response length={}", agentName, responseText.length());
-                streamTracker.completeAndConsumeIfLast(conversationId);
+                ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
+                if (cr.allDone()) {
+                    streamTracker.broadcastObject(conversationId, "done", Map.of(
+                            "conversationId", conversationId,
+                            "status", "completed"
+                    ));
+                }
             })
             .doOnError(err -> {
                 log.error("[Dispatcher] Agent {} error: {}", agentName, err.getMessage());
                 broadcastAgentError(conversationId, agentName, err.getMessage());
                 processManager.terminate(agentIdStr);
-                streamTracker.completeAndConsumeIfLast(conversationId);
+                ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
+                if (cr.allDone()) {
+                    streamTracker.broadcastObject(conversationId, "done", Map.of(
+                            "conversationId", conversationId,
+                            "status", "error",
+                            "error", err.getMessage()
+                    ));
+                }
             })
             .subscribe();
 

@@ -807,21 +807,25 @@ public class ChatController {
                                             "hasThinking", !accumulator.getThinking().isBlank(),
                                             "hasContent", !assistantText.isBlank()
                                     ));
-                                    // Wrap done broadcast in its own try-catch so a DB
-                                    // failure in getMessageCount doesn't silently drop done
-                                    try {
-                                        int msgCount = conversationService.getMessageCount(conversationId);
-                                        broadcastEvent(conversationId, "done", buildDonePayload(
-                                                conversationId, persistStatus, savedAssistant,
-                                                accumulator.getPromptTokens(), accumulator.getCompletionTokens(),
-                                                isAssistantPersisted(savedAssistant), msgCount));
-                                    } catch (Exception doneEx) {
-                                        log.warn("Done payload build failed for {}: {}, sending minimal done",
-                                                conversationId, doneEx.getMessage());
-                                        broadcastEvent(conversationId, "done", Map.of(
-                                                "conversationId", conversationId,
-                                                "status", persistStatus
-                                        ));
+                                    // Defer "done" for group chats: sub-agents may still be active.
+                                    // The last sub-agent will broadcast "done" when it finishes.
+                                    if (!isGroupChat) {
+                                        // Wrap done broadcast in its own try-catch so a DB
+                                        // failure in getMessageCount doesn't silently drop done
+                                        try {
+                                            int msgCount = conversationService.getMessageCount(conversationId);
+                                            broadcastEvent(conversationId, "done", buildDonePayload(
+                                                    conversationId, persistStatus, savedAssistant,
+                                                    accumulator.getPromptTokens(), accumulator.getCompletionTokens(),
+                                                    isAssistantPersisted(savedAssistant), msgCount));
+                                        } catch (Exception doneEx) {
+                                            log.warn("Done payload build failed for {}: {}, sending minimal done",
+                                                    conversationId, doneEx.getMessage());
+                                            broadcastEvent(conversationId, "done", Map.of(
+                                                    "conversationId", conversationId,
+                                                    "status", persistStatus
+                                            ));
+                                        }
                                     }
                                 }
                             } catch (Exception e) {
