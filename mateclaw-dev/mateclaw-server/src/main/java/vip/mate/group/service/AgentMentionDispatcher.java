@@ -36,8 +36,8 @@ public class AgentMentionDispatcher {
     private final ChatStreamTracker streamTracker;
     private final MessageMapper messageMapper;
 
-    /** Regex: @AgentName: task content */
-    private static final Pattern AGENT_PATTERN = Pattern.compile("^@(\\S+):\\s*(.+)$");
+    /** Regex: @AgentName task content */
+    private static final Pattern AGENT_PATTERN = Pattern.compile("^@(\\S+)\\s+(.+)$");
 
     /** Track active agent streams per conversation to avoid duplicate spawns */
     private final Map<String, Map<String, Boolean>> dispatchedAgents = new ConcurrentHashMap<>();

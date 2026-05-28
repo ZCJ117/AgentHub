@@ -13,7 +13,8 @@ const EMOJI_MAP = { like: '👍', dislike: '👎', regenerate: '🔄', apply_dif
 
 const props = defineProps({
   message: { type: Object, required: true },
-  isPinned: { type: Boolean, default: false }
+  isPinned: { type: Boolean, default: false },
+  agentNames: { type: Array, default: () => [] }
 })
 
 const artifactStore = useArtifactStore()
@@ -40,7 +41,7 @@ const isError = computed(() => props.message.status === 'error')
 
 const renderedContent = computed(() => {
   if (props.message.messageType === 'text' || props.message.messageType === 'system') {
-    const highlighted = highlightAgentMentions(props.message.content || '')
+    const highlighted = highlightAgentMentions(props.message.content || '', props.agentNames)
     return renderMarkdown(highlighted)
   }
   return ''

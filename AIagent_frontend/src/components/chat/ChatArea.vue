@@ -1,18 +1,50 @@
 <script setup>
 import { ref, computed, watch, nextTick } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
+import { useAgentStore } from '@/stores/agent'
+import { NAvatar } from 'naive-ui'
 import MessageBubble from './MessageBubble.vue'
 import ChatEmpty from './ChatEmpty.vue'
 import Composer from './Composer.vue'
 import StatusBar from './StatusBar.vue'
 
 const convStore = useConversationStore()
+const agentStore = useAgentStore()
 
 const props = defineProps({
   messages: { type: Array, default: () => [] },
   isStreaming: { type: Boolean, default: false },
   conversation: { type: Object, default: null },
   prefillText: { type: String, default: '' }
+})
+
+const headerTitle = computed(() => {
+  if (props.conversation?.title) return props.conversation.title
+  if (props.conversation?.agentName) return props.conversation.agentName
+  if (agentStore.selectedAgent?.name) return agentStore.selectedAgent.name
+  return '新对话'
+})
+
+const headerSubtitle = computed(() => {
+  const conv = props.conversation
+  if (conv?.conversationType === 'group') {
+    const count = conv.members?.length || 0
+    return count > 0 ? `群聊 · ${count} 人` : '群聊'
+  }
+  const agentName = conv?.agentName || agentStore.selectedAgent?.name
+  return agentName ? `AI 对话 · ${agentName}` : 'AI 对话'
+})
+
+const agentNames = computed(() => {
+  const members = props.conversation?.members
+  if (!members || !Array.isArray(members)) return []
+  return members.map(m => m.agentName).filter(Boolean)
+})
+
+const headerAvatar = computed(() => {
+  if (props.conversation?.agentAvatarUrl) return props.conversation.agentAvatarUrl
+  if (agentStore.selectedAgent?.avatarUrl) return agentStore.selectedAgent.avatarUrl
+  return null
 })
 
 const emit = defineEmits([
@@ -56,10 +88,14 @@ watch(
 
 <template>
   <div class="chat-area">
-    <div class="chat-title">
-      <span class="title-text">
-        {{ conversation?.title || conversation?.agentName || '新对话' }}
-      </span>
+    <div class="chat-header">
+      <NAvatar :size="38" round :src="headerAvatar" :fallback-src="undefined">
+        {{ (headerTitle || 'AI')[0] }}
+      </NAvatar>
+      <div class="header-text">
+        <span class="header-title">{{ headerTitle }}</span>
+        <span class="header-subtitle">{{ headerSubtitle }}</span>
+      </div>
     </div>
 
     <div ref="messagesContainer" class="messages-container">
@@ -70,6 +106,7 @@ watch(
         :key="msg.id"
         :message="msg"
         :is-pinned="pinnedIds.has(msg.id)"
+        :agent-names="agentNames"
         @regenerate="emit('regenerate', $event)"
         @reaction="(msgId, type) => emit('reaction', msgId, type)"
         @apply-diff="id => emit('applyDiff', id)"
@@ -107,17 +144,36 @@ watch(
   min-height: 0;
 }
 
-.chat-title {
-  padding: 12px 16px;
+.chat-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
   border-bottom: 1px solid #E5E5EA;
-  background: rgba(255,255,255,0.8);
+  background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(20px);
 }
 
-.title-text {
-  font-size: 18px;
+.header-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.header-title {
+  font-size: 16px;
   font-weight: 600;
   color: #1D1D1F;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-subtitle {
+  font-size: 12px;
+  color: #86868B;
+  line-height: 1.3;
 }
 
 .messages-container {

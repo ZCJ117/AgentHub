@@ -12,9 +12,15 @@ export function renderMarkdown(text) {
   return DOMPurify.sanitize(raw)
 }
 
-const AGENT_MENTION_RE = /@([^\s,，。；;:：\n]+)/g
+function escapeRegex(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
 
-export function highlightAgentMentions(text) {
+export function highlightAgentMentions(text, agentNames = []) {
   if (!text) return ''
-  return text.replace(AGENT_MENTION_RE, '<span class="agent-mention">$&</span>')
+  if (!agentNames || agentNames.length === 0) return text
+  const sorted = [...agentNames].sort((a, b) => b.length - a.length)
+  const escaped = sorted.map(escapeRegex)
+  const pattern = new RegExp(`@(${escaped.join('|')})`, 'g')
+  return text.replace(pattern, '<span class="agent-mention">$&</span>')
 }
