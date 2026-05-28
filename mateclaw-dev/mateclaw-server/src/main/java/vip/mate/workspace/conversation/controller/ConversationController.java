@@ -1,21 +1,30 @@
 package vip.mate.workspace.conversation.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import vip.mate.agent.model.AgentEntity;
+import vip.mate.agent.repository.AgentMapper;
 import vip.mate.common.result.R;
 import vip.mate.channel.web.ChatStreamTracker;
+import vip.mate.group.model.GroupMemberEntity;
+import vip.mate.group.repository.GroupMemberMapper;
 import vip.mate.workspace.conversation.ConversationService;
+import vip.mate.workspace.conversation.model.ConversationEntity;
+import vip.mate.workspace.conversation.repository.ConversationMapper;
 import vip.mate.message.model.MessagePinEntity;
 import vip.mate.message.service.MessagePinService;
 import vip.mate.message.service.MessageReactionService;
 import vip.mate.workspace.conversation.vo.ConversationVO;
 import vip.mate.workspace.conversation.vo.MessageVO;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 会话管理接口
@@ -32,6 +41,9 @@ public class ConversationController {
     private final ChatStreamTracker streamTracker;
     private final MessageReactionService reactionService;
     private final MessagePinService pinService;
+    private final ConversationMapper conversationMapper;
+    private final AgentMapper agentMapper;
+    private final GroupMemberMapper groupMemberMapper;
 
     /**
      * 获取当前用户的会话列表
@@ -272,6 +284,78 @@ public class ConversationController {
         // 回退到数据库持久化的 stream_status（处理服务重启/节点切换场景）
         String dbStatus = conversationService.getStreamStatus(conversationId);
         return R.ok(Map.of("streamStatus", dbStatus != null ? dbStatus : "idle"));
+    }
+
+    /**
+     * 获取会话详情（含成员列表），用于群聊 @AgentName 标亮等功能。
+     * id 同时支持 Long PK 和 UUID conversationId 两种格式。
+     */
+    @Operation(summary = "获取会话详情")
+    @GetMapping("/{id}")
+    public R<Map<String, Object>> detail(@PathVariable String id, Authentication auth) {
+        String username = auth != null ? auth.getName() : "anonymous";
+
+        ConversationEntity conv = conversationService.getByConversationId(id);
+        if (conv == null) {
+            try {
+                Long numericId = Long.parseLong(id);
+                conv = conversationMapper.selectById(numericId);
+            } catch (NumberFormatException ignored) {}
+        }
+        if (conv == null) {
+            return R.fail(404, "会话不存在");
+        }
+        if (!conversationService.isConversationOwner(conv.getConversationId(), username)) {
+            return R.fail(403, "无权访问该会话");
+        }
+
+        String agentName = null;
+        String agentIcon = null;
+        if (conv.getAgentId() != null) {
+            AgentEntity agent = agentMapper.selectById(conv.getAgentId());
+            if (agent != null) {
+                agentName = agent.getName();
+                agentIcon = agent.getIcon();
+            }
+        }
+        ConversationVO vo = ConversationVO.from(conv, agentName, agentIcon);
+
+        List<Map<String, Object>> members = List.of();
+        if ("group".equals(conv.getConversationType())) {
+            List<GroupMemberEntity> memberEntities = groupMemberMapper.selectList(
+                new LambdaQueryWrapper<GroupMemberEntity>()
+                    .eq(GroupMemberEntity::getConversationId, conv.getId()));
+            members = memberEntities.stream().map(m -> {
+                AgentEntity ag = agentMapper.selectById(m.getAgentId());
+                Map<String, Object> map = new LinkedHashMap<>();
+                map.put("agentId", m.getAgentId());
+                map.put("agentName", ag != null ? ag.getName() : "Unknown");
+                map.put("memberRole", m.getMemberRole());
+                map.put("joinedAt", m.getJoinedAt() != null ? m.getJoinedAt().toString() : null);
+                return map;
+            }).collect(Collectors.toList());
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", vo.getId());
+        result.put("conversationId", vo.getConversationId());
+        result.put("title", vo.getTitle());
+        result.put("agentId", vo.getAgentId());
+        result.put("agentName", vo.getAgentName());
+        result.put("agentIcon", vo.getAgentIcon());
+        result.put("agentAvatarUrl", vo.getAgentAvatarUrl());
+        result.put("username", vo.getUsername());
+        result.put("messageCount", vo.getMessageCount());
+        result.put("lastMessage", vo.getLastMessage());
+        result.put("lastActiveTime", vo.getLastActiveTime() != null ? vo.getLastActiveTime().toString() : null);
+        result.put("conversationType", vo.getConversationType());
+        result.put("archived", vo.getArchived());
+        result.put("pinnedAt", vo.getPinnedAt() != null ? vo.getPinnedAt().toString() : null);
+        result.put("lastActiveAt", vo.getLastActiveAt() != null ? vo.getLastActiveAt().toString() : null);
+        result.put("lastMessagePreview", vo.getLastMessagePreview());
+        result.put("unreadCount", vo.getUnreadCount());
+        result.put("members", members);
+        return R.ok(result);
     }
 
     @Operation(summary = "获取消息反馈")

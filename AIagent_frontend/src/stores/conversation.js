@@ -20,15 +20,27 @@ export const useConversationStore = defineStore('conversation', () => {
   const loadingMore = ref(false)
 
   const pinnedMessages = ref([])
+  const conversationDetailCache = ref(new Map())
+  const pendingDetailFetches = new Map()
 
   async function loadPinnedMessages(conversationId) {
     const res = await fetchPinnedMessages(conversationId)
     pinnedMessages.value = res || []
   }
 
-  const activeConversation = computed(() =>
-    conversations.value.find(c => c.id === activeId.value) || null
-  )
+  const activeConversation = computed(() => {
+    const base = conversations.value.find(c =>
+      c.conversationId === activeId.value || String(c.id) === String(activeId.value)
+    )
+    if (!base) return null
+
+    const cacheKey = String(base.id) || base.conversationId
+    const detail = conversationDetailCache.value.get(cacheKey)
+    if (detail) {
+      return { ...base, members: detail.members || [] }
+    }
+    return base
+  })
 
   const sortedConversations = computed(() => {
     const list = [...conversations.value]
@@ -96,30 +108,60 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
-  function setActive(id) {
+  async function setActive(id) {
     activeId.value = id
+    if (!id) return
+
+    const cacheKey = String(id)
+    if (conversationDetailCache.value.has(cacheKey)) return
+    if (pendingDetailFetches.has(cacheKey)) return
+
+    const promise = (async () => {
+      try {
+        const detail = await fetchConversationDetail(id)
+        if (detail) {
+          conversationDetailCache.value.set(cacheKey, detail)
+          if (detail.conversationId && detail.conversationId !== String(id)) {
+            conversationDetailCache.value.set(detail.conversationId, detail)
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to fetch conversation detail:', e)
+      } finally {
+        pendingDetailFetches.delete(cacheKey)
+      }
+    })()
+    pendingDetailFetches.set(cacheKey, promise)
+  }
+
+  function _findConv(identifier) {
+    return conversations.value.find(c =>
+      c.conversationId === identifier || String(c.id) === String(identifier)
+    )
   }
 
   async function togglePin(id) {
-    const conv = conversations.value.find(c => c.id === id)
+    const conv = _findConv(id)
     if (!conv) return
     const newState = !conv.pinnedAt
-    await toggleConversationPin(id, newState)
+    await toggleConversationPin(conv.conversationId, newState)
     conv.pinnedAt = newState ? new Date().toISOString() : null
   }
 
   async function toggleArchive(id) {
-    const conv = conversations.value.find(c => c.id === id)
+    const conv = _findConv(id)
     if (!conv) return
     const newState = !conv.archived
-    await toggleConversationArchive(id, newState)
+    await toggleConversationArchive(conv.conversationId, newState)
     conv.archived = newState
   }
 
   async function deleteConversation(id) {
-    await deleteConvApi(id)
-    conversations.value = conversations.value.filter(c => c.id !== id)
-    if (activeId.value === id) {
+    const conv = _findConv(id)
+    const cid = conv ? conv.conversationId : id
+    await deleteConvApi(cid)
+    conversations.value = conversations.value.filter(c => c.conversationId !== cid)
+    if (activeId.value === id || activeId.value === cid) {
       activeId.value = null
     }
   }
