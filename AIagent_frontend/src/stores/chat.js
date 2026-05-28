@@ -353,7 +353,7 @@ export const useChatStore = defineStore('chat', () => {
     sse.on('message_complete', (data) => {
       if (data.status === 'completed' || data.status === 'stopped') {
         setTimeout(() => {
-          if (!doneReceived && isStreaming.value) {
+          if (!doneReceived && isStreaming.value && agentStreams.value.size === 0) {
             updateMessage(assistantId, { status: 'completed' })
             isStreaming.value = false
             sse.disconnect()
