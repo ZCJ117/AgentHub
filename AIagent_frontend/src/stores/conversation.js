@@ -34,7 +34,7 @@ export const useConversationStore = defineStore('conversation', () => {
     )
     if (!base) return null
 
-    const cacheKey = String(base.id) || base.conversationId
+    const cacheKey = base.conversationId || String(base.id)
     const detail = conversationDetailCache.value.get(cacheKey)
     if (detail) {
       return { ...base, members: detail.members || [] }
