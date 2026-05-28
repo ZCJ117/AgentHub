@@ -74,13 +74,6 @@ public class ChatController {
     // 使用虚拟线程池处理 SSE（Java 17+ 兼容，Java 21 可用 Executors.newVirtualThreadPerTaskExecutor()）
     private final ExecutorService sseExecutor = Executors.newCachedThreadPool();
 
-    /**
-     * Direct SSE writer that bypasses the broken SseEmitter — writes raw SSE
-     * events directly to the HttpServletResponse output stream. Set per-request
-     * via ThreadLocal; events are delivered even when SseEmitter silently fails.
-     */
-    private final java.util.concurrent.ConcurrentHashMap<String, jakarta.servlet.ServletOutputStream> directSseOutMap = new java.util.concurrent.ConcurrentHashMap<>();
-
     // TEMPORARY: test if raw HTTP streaming works
     @GetMapping("/test-stream")
     public void testStream(jakarta.servlet.http.HttpServletResponse response) throws Exception {
@@ -542,7 +535,7 @@ public class ChatController {
                 httpResp.setCharacterEncoding("UTF-8");
                 httpResp.setHeader("Cache-Control", "no-cache");
                 httpResp.setHeader("X-Accel-Buffering", "no");
-                directSseOutMap.put(conversationId, httpResp.getOutputStream());
+                streamTracker.registerDirectSse(conversationId, httpResp.getOutputStream());
             }
         } catch (Exception e) {
             log.warn("Failed to set up direct SSE output stream: {}", e.getMessage());
@@ -1532,7 +1525,6 @@ public class ChatController {
             payload = "{\"message\":\"serialization_error\"}";
         }
         emitter.send(SseEmitter.event().name(name).data(payload));
-        directWriteSse(conversationId, name, payload);
     }
 
     private void broadcastEvent(String conversationId, String name, Object data) {
@@ -1543,19 +1535,6 @@ public class ChatController {
             payload = "{\"message\":\"serialization_error\"}";
         }
         streamTracker.broadcast(conversationId, name, payload);
-        directWriteSse(conversationId, name, payload);
-    }
-
-    private void directWriteSse(String conversationId, String name, String payload) {
-        jakarta.servlet.ServletOutputStream out = directSseOutMap.get(conversationId);
-        if (out == null) return;
-        try {
-            String sse = "event: " + name + "\ndata: " + payload + "\n\n";
-            out.write(sse.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            out.flush();
-        } catch (Exception e) {
-            log.warn("Direct SSE write failed for {}: {}", name, e.getMessage());
-        }
     }
 
     /**
@@ -1821,10 +1800,7 @@ public class ChatController {
             log.debug("Emitter already completed: {}", e.getMessage());
         }
         // Clean up direct SSE output stream
-        jakarta.servlet.ServletOutputStream out = directSseOutMap.remove(conversationId);
-        if (out != null) {
-            try { out.close(); } catch (Exception ignored) {}
-        }
+        streamTracker.removeAndCloseDirectSse(conversationId);
     }
 
     /**
