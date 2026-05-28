@@ -30,6 +30,9 @@ export const useChatStore = defineStore('chat', () => {
   // Multi-agent group chat: maps agentName → local message id
   const agentStreams = ref(new Map())
 
+  // Router must be obtained at store setup time, not inside async SSE callbacks
+  const router = useRouter()
+
   function setReplyTo(msg) {
     replyTo.value = {
       id: msg.id,
@@ -275,6 +278,12 @@ export const useChatStore = defineStore('chat', () => {
       if (data.conversationId) {
         conversationId.value = data.conversationId
       }
+      // Set orchestrator sender name for group chat messages
+      const convStore = useConversationStore()
+      const conv = convStore.activeConversation
+      if (conv?.conversationType === 'group') {
+        updateMessage(assistantId, { senderAgentName: '任务分配智能体' })
+      }
     })
 
     sse.on('done', async (data) => {
@@ -318,8 +327,7 @@ export const useChatStore = defineStore('chat', () => {
         const conv = convStore.conversations.find(
           c => String(c.conversationId) === String(conversationId.value)
         )
-        if (conv) {
-          const router = useRouter()
+        if (conv && conv.id != null) {
           router.replace(`/chat/${conv.id}`)
         }
       }
