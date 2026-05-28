@@ -322,8 +322,8 @@ export const useChatStore = defineStore('chat', () => {
       const convStore = useConversationStore()
       await convStore.loadList()
 
-      // Navigate to conversation page if we have a valid ID
-      if (conversationId.value) {
+      // Navigate to conversation page only for new chats (no route param yet)
+      if (conversationId.value && !router.currentRoute.value.params.conversationId) {
         const conv = convStore.conversations.find(
           c => String(c.conversationId) === String(conversationId.value)
         )
