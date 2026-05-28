@@ -45,6 +45,13 @@ export const useChatStore = defineStore('chat', () => {
     replyTo.value = null
   }
 
+  function cleanupAgentStreams(status) {
+    agentStreams.value.forEach((agentId) => {
+      updateMessage(agentId, { status })
+    })
+    agentStreams.value.clear()
+  }
+
   let sse = null
 
   const isEmpty = computed(() => messages.value.length === 0)
@@ -163,6 +170,7 @@ export const useChatStore = defineStore('chat', () => {
       if (!contentReceived && isStreaming.value) {
         streamError.value = 'Agent 响应超时，请重试'
         updateMessage(assistantId, { status: 'error' })
+        cleanupAgentStreams('error')
         isStreaming.value = false
         sse.disconnect()
       }
@@ -171,6 +179,7 @@ export const useChatStore = defineStore('chat', () => {
     const maxTimeId = setTimeout(() => {
       if (isStreaming.value) {
         updateMessage(assistantId, { status: 'completed' })
+        cleanupAgentStreams('error')
         isStreaming.value = false
         sse.disconnect()
       }
@@ -184,6 +193,7 @@ export const useChatStore = defineStore('chat', () => {
         if (isStreaming.value) {
           streamError.value = 'Agent 响应超时，请重试'
           updateMessage(assistantId, { status: 'error' })
+          cleanupAgentStreams('error')
           isStreaming.value = false
           sse.disconnect()
         }

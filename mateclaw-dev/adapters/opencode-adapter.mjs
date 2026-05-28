@@ -1,5 +1,8 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const rl = createInterface({ input: process.stdin });
 
@@ -49,21 +52,85 @@ rl.on('line', (line) => {
                 stdio: ['ignore', 'pipe', 'pipe']
             });
 
+            // Create temp log files — raw JSON for debugging, clean text for the terminal window
+            const logFile = path.join(os.tmpdir(), `agenthub-opencode-${Date.now()}.log`);
+            const cleanLogFile = path.join(os.tmpdir(), `agenthub-opencode-clean-${Date.now()}.log`);
+            const logStream = fs.createWriteStream(logFile);
+            const cleanLogStream = fs.createWriteStream(cleanLogFile);
+            cleanLogStream.write('﻿'); // UTF-8 BOM for Windows PowerShell compatibility
+            process.stderr.write(`[opencode-adapter] Log file: ${logFile}\n`);
+
+            function sendText(delta) {
+                send('text', { delta });
+                cleanLogStream.write(delta);
+                forwardedCount++;
+            }
+
             let buffer = '';
+            let receivedCount = 0;
+            let forwardedCount = 0;
             child.stdout.on('data', (chunk) => {
+                logStream.write(chunk);  // Tee to log file for terminal window
                 buffer += chunk.toString();
                 const lines = buffer.split('\n');
                 buffer = lines.pop();
 
                 for (const l of lines) {
                     if (!l.trim()) continue;
+
+                    let event;
                     try {
-                        const event = JSON.parse(l);
+                        event = JSON.parse(l);
+                    } catch {
+                        process.stderr.write('[opencode-adapter] JSON parse error: ' + l.slice(0, 200) + '\n');
+                        continue;
+                    }
+
+                    receivedCount++;
+
+                    try {
                         switch (event.type) {
-                            case 'assistant':
+                            case 'stream_event':
+                                // Partial-JSON rendering events
+                                if (event.delta?.text) {
+                                    sendText(event.delta.text);
+                                }
+                                if (event.delta?.partial_json) {
+                                    sendText(event.delta.partial_json);
+                                }
+                                break;
+                            case 'content_block_start':
+                                if (event.content_block?.type === 'text' && event.content_block?.text) {
+                                    sendText(event.content_block.text);
+                                }
+                                break;
+                            case 'content_block_stop':
+                                break;
+                            case 'assistant': {
+                                // Handle nested content blocks (Claude Code 2.x format)
+                                const blocks = event.message?.content;
+                                if (blocks && Array.isArray(blocks)) {
+                                    for (const block of blocks) {
+                                        if (block.type === 'text' && block.text) {
+                                            sendText(block.text);
+                                        } else if (block.type === 'tool_use') {
+                                            send('tool_call', {
+                                                toolName: block.name,
+                                                toolInput: block.input,
+                                                toolId: block.id
+                                            });
+                                        }
+                                    }
+                                }
+                                // Also handle flat delta.text (Anthropic API format)
+                                if (event.delta?.text) {
+                                    sendText(event.delta.text);
+                                }
+                                break;
+                            }
                             case 'content_block_delta':
                                 if (event.delta?.text) {
-                                    send('text', { delta: event.delta.text });
+                                    sendText(event.delta.text);
                                 }
                                 break;
                             case 'tool_use':
@@ -79,31 +146,94 @@ rl.on('line', (line) => {
                                     content: event.content
                                 });
                                 break;
-                            default:
-                                if (event.text || event.content) {
-                                    send('text', { delta: event.text || event.content });
+                            case 'user': {
+                                // tool_result may be embedded in user message content blocks
+                                const userBlocks = event.message?.content;
+                                if (userBlocks && Array.isArray(userBlocks)) {
+                                    for (const block of userBlocks) {
+                                        if (block.type === 'tool_result') {
+                                            send('tool_result', {
+                                                toolId: block.tool_use_id,
+                                                content: block.content
+                                            });
+                                        }
+                                    }
                                 }
+                                break;
+                            }
+                            case 'system':
+                            case 'init':
+                                // Infrastructure events — silently suppress
+                                break;
+                            case 'result':
+                                // Final result event — text already forwarded via assistant events
+                                break;
+                            default: {
+                                const textLike = event.text || event.content || event.delta?.text;
+                                if (textLike && typeof textLike === 'string' && textLike.length < 5000) {
+                                    sendText(textLike);
+                                } else if (!textLike) {
+                                    process.stderr.write('[opencode-adapter] Unhandled event type: ' + event.type + '\n');
+                                }
+                            }
                         }
-                    } catch {
-                        send('text', { delta: l });
+                    } catch (processingError) {
+                        process.stderr.write('[opencode-adapter] Dispatch error for type=' +
+                            (event?.type || 'unknown') + ': ' + processingError.message + '\n');
                     }
                 }
             });
 
             child.stderr.on('data', (chunk) => {
+                logStream.write(chunk);  // Tee stderr to log file too
                 process.stderr.write('[opencode] ' + chunk);
             });
 
+            let finalEventSent = false;
+            function sendFinal(type, payload = {}) {
+                if (finalEventSent) return;
+                finalEventSent = true;
+                send(type, payload);
+            }
+
             child.on('close', (code) => {
-                if (buffer.trim()) {
-                    send('text', { delta: buffer });
+                logStream.end();
+                cleanLogStream.end();
+                process.stderr.write(`[opencode-adapter] received=${receivedCount} forwarded=${forwardedCount}\n`);
+                if (buffer.trim() && !finalEventSent) {
+                    sendText(buffer);
                 }
-                send('done', { exitCode: code });
+                sendFinal('done', { exitCode: code });
+                rl.close();
+                process.exit(0);
             });
 
             child.on('error', (err) => {
-                send('error', { message: 'Failed to start opencode: ' + err.message });
+                logStream.end();
+                cleanLogStream.end();
+                const hint = err.code === 'ENOENT'
+                    ? ' — the "opencode" command was not found. Install OpenCode CLI or add it to your PATH.'
+                    : '';
+                send('error', { message: 'Failed to start opencode: ' + err.message + hint });
+                sendFinal('done', { exitCode: 1 });
+                rl.close();
+                process.exit(1);
             });
+
+            // Open a terminal window to tail the clean log file
+            const title = `AgentHub — ${agentName || 'OpenCode'}`;
+            if (process.platform === 'win32') {
+                spawn('cmd', ['/c', 'start', title, 'powershell', '-NoExit', '-Command',
+                    `chcp 65001 > $null; $Host.UI.RawUI.WindowTitle = '${title}'; Write-Host 'AgentHub — ${agentName || 'OpenCode'}'; Get-Content -Path '${cleanLogFile}' -Encoding UTF8 -Wait`],
+                    { stdio: 'ignore', detached: true });
+            } else if (process.platform === 'darwin') {
+                spawn('osascript', ['-e',
+                    `tell app "Terminal" to do script "tail -f ${cleanLogFile}; exit"`],
+                    { stdio: 'ignore', detached: true });
+            } else {
+                spawn('x-terminal-emulator', ['-e', `tail -f ${cleanLogFile}`],
+                    { stdio: 'ignore', detached: true });
+            }
             break;
         }
 

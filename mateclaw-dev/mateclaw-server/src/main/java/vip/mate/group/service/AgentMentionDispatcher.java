@@ -88,6 +88,10 @@ public class AgentMentionDispatcher {
                 "taskDescription", task
         ));
 
+        // Increment flux count BEFORE starting virtual thread
+        // so orchestrator's completeAndConsumeIfLast sees this sub-agent
+        streamTracker.incrementFlux(conversationId);
+
         // Run agent in a virtual thread so orchestrator stream is not blocked
         Thread vt = Thread.startVirtualThread(() -> {
             try {
@@ -128,8 +132,6 @@ public class AgentMentionDispatcher {
                 broadcastAgentError(conversationId, agentName, "Agent CLI 启动失败");
                 return;
             }
-
-            streamTracker.incrementFlux(conversationId);
 
             Flux.<AgentService.StreamDelta>create(sink -> {
                 processManager.registerResponseSink(agentIdStr, sink);

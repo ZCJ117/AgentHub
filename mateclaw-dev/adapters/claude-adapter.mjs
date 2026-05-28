@@ -219,6 +219,8 @@ rl.on('line', (line) => {
                     sendText(buffer);
                 }
                 sendFinal('done', { exitCode: code });
+                rl.close();
+                process.exit(0);
             });
 
             child.on('error', (err) => {
@@ -229,6 +231,8 @@ rl.on('line', (line) => {
                     : '';
                 send('error', { message: 'Failed to start claude: ' + err.message + hint });
                 sendFinal('done', { exitCode: 1 });
+                rl.close();
+                process.exit(1);
             });
 
             // Open a terminal window to tail the clean log file
