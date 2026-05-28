@@ -129,6 +129,8 @@ public class AgentMentionDispatcher {
                 return;
             }
 
+            streamTracker.incrementFlux(conversationId);
+
             Flux.<AgentService.StreamDelta>create(sink -> {
                 processManager.registerResponseSink(agentIdStr, sink);
                 sink.onDispose(() -> {
@@ -173,11 +175,13 @@ public class AgentMentionDispatcher {
                 ));
                 processManager.terminate(agentIdStr);
                 log.info("[Dispatcher] Agent {} completed, response length={}", agentName, responseText.length());
+                streamTracker.completeAndConsumeIfLast(conversationId);
             })
             .doOnError(err -> {
                 log.error("[Dispatcher] Agent {} error: {}", agentName, err.getMessage());
                 broadcastAgentError(conversationId, agentName, err.getMessage());
                 processManager.terminate(agentIdStr);
+                streamTracker.completeAndConsumeIfLast(conversationId);
             })
             .subscribe();
 
