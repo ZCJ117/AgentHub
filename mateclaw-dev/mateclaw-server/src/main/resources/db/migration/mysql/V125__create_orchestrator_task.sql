@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS mate_orchestrator_task (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    conversation_id BIGINT NOT NULL,
+    message_id BIGINT NOT NULL,
+    title VARCHAR(500) NOT NULL,
+    plan_json MEDIUMTEXT NOT NULL,
+    status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    total_assignments INT NOT NULL DEFAULT 0,
+    completed_assignments INT NOT NULL DEFAULT 0,
+    failed_assignments INT NOT NULL DEFAULT 0,
+    started_at DATETIME,
+    completed_at DATETIME,
+    aggregation_message_id BIGINT,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_ot_conversation (conversation_id),
+    KEY idx_ot_status (status),
+    KEY idx_ot_created (created_at),
+    CONSTRAINT fk_ot_conversation FOREIGN KEY (conversation_id) REFERENCES mate_conversation(id) ON DELETE CASCADE,
+    CONSTRAINT fk_ot_message FOREIGN KEY (message_id) REFERENCES mate_message(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

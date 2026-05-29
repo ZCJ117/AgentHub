@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS mate_orchestrator_assignment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    task_id BIGINT NOT NULL,
+    agent_id BIGINT NOT NULL,
+    step_order INT NOT NULL,
+    execution_mode VARCHAR(20) NOT NULL DEFAULT 'sequential',
+    goal TEXT NOT NULL,
+    dependency_on BIGINT,
+    status VARCHAR(30) NOT NULL DEFAULT 'pending',
+    child_conversation_id BIGINT,
+    result_summary VARCHAR(2000),
+    error_message VARCHAR(2000),
+    retry_count INT NOT NULL DEFAULT 0,
+    started_at DATETIME,
+    completed_at DATETIME,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_oa_task FOREIGN KEY (task_id) REFERENCES mate_orchestrator_task(id) ON DELETE CASCADE,
+    CONSTRAINT fk_oa_agent FOREIGN KEY (agent_id) REFERENCES mate_agent(id) ON DELETE RESTRICT,
+    KEY idx_oa_task (task_id),
+    KEY idx_oa_agent (agent_id),
+    KEY idx_oa_status (status),
+    KEY idx_oa_child_conv (child_conversation_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

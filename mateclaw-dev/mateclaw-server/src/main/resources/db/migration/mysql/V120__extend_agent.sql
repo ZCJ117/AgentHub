@@ -1,0 +1,4 @@
+ALTER TABLE mate_agent ADD COLUMN avatar_url VARCHAR(500);
+ALTER TABLE mate_agent ADD COLUMN capability_tags VARCHAR(500);
+ALTER TABLE mate_agent ADD COLUMN agent_status VARCHAR(20) DEFAULT 'AVAILABLE';
+ALTER TABLE mate_agent ADD COLUMN is_public TINYINT(1) DEFAULT 1;
