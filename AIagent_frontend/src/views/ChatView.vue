@@ -35,6 +35,7 @@ watch(
   () => route.params.conversationId,
   async (id) => {
     const convId = id || null
+    if (String(convStore.activeId) === String(convId)) return
     convStore.setActive(convId)
     await chatStore.initConversation(convId)
     if (convId) {
