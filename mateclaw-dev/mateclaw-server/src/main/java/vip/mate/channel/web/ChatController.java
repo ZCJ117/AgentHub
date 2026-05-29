@@ -843,6 +843,14 @@ public class ChatController {
                                         startQueuedMessage(conversationId, emitter, emitterDone, cr.queuedInput(), username);
                                     } else {
                                         conversationService.updateStreamStatus(conversationId, "idle");
+                                        // If this is a group chat and all fluxes are done
+                                        // (no sub-agents active), broadcast deferred "done".
+                                        if (isGroupChat) {
+                                            broadcastEvent(conversationId, "done", Map.of(
+                                                    "conversationId", conversationId,
+                                                    "status", persistStatus
+                                            ));
+                                        }
                                         // 延迟关闭 emitter，确保最后的事件都已发送
                                         sseExecutor.execute(() -> {
                                             try {

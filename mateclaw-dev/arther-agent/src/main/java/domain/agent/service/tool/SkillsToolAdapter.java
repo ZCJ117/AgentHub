@@ -1,13 +1,13 @@
-package cn.zcj.aether.domain.agent.service.tool;
+package domain.agent.service.tool;
 
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
-import cn.zcj.aether.domain.agent.service.armory.matter.skills.ToolSkillsCreateService;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.service.armory.matter.skills.ToolSkillsCreateService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.Map;
 
 /**

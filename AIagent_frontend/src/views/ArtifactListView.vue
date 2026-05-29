@@ -50,6 +50,7 @@ const types = ['html', 'code', 'markdown', 'pdf', 'ppt', 'image', 'other']
 <template>
   <div class="artifact-list-view">
     <div class="page-header">
+      <NButton text @click="router.push('/chat')" style="font-size:18px">&larr; 返回</NButton>
       <h2>产物库</h2>
       <NInput v-model:value="searchKeyword" placeholder="搜索产物..." clearable style="width: 240px" />
     </div>

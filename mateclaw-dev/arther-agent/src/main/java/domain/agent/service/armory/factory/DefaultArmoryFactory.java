@@ -1,10 +1,10 @@
-package cn.zcj.aether.domain.agent.service.armory.factory;
+package domain.agent.service.armory.factory;
 
-import cn.zcj.aether.domain.agent.model.entity.ArmoryCommandEntity;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentRegisterVO;
-import cn.zcj.aether.domain.agent.service.armory.AgentRegistry;
-import cn.zcj.aether.domain.agent.service.armory.node.RootNode;
+import domain.agent.model.entity.ArmoryCommandEntity;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.model.valobj.AiAgentRegisterVO;
+import domain.agent.service.armory.AgentRegistry;
+import domain.agent.service.armory.node.RootNode;
 import cn.bugstack.wrench.design.framework.tree.StrategyHandler;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,7 +14,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 

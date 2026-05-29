@@ -1,4 +1,4 @@
-package cn.zcj.aether.types.exception;
+package type;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;

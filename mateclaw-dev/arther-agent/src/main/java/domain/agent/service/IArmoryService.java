@@ -1,6 +1,6 @@
-package cn.zcj.aether.domain.agent.service;
+package domain.agent.service;
 
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
 
 import java.util.List;
 

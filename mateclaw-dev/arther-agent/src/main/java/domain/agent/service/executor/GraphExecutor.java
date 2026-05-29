@@ -1,10 +1,10 @@
-package cn.zcj.aether.domain.agent.service.executor;
+package domain.agent.service.executor;
 
-import cn.zcj.aether.domain.agent.model.graph.AgentEdge;
-import cn.zcj.aether.domain.agent.model.graph.AgentGraph;
-import cn.zcj.aether.domain.agent.model.graph.AgentNodeDef;
-import cn.zcj.aether.domain.agent.service.runtime.AgentRuntime;
-import cn.zcj.aether.domain.agent.service.runtime.RuntimeEvent;
+import domain.agent.model.graph.AgentEdge;
+import domain.agent.model.graph.AgentGraph;
+import domain.agent.model.graph.AgentNodeDef;
+import domain.agent.service.runtime.AgentRuntime;
+import domain.agent.service.runtime.RuntimeEvent;
 import io.reactivex.rxjava3.core.BackpressureStrategy;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.FlowableEmitter;
@@ -12,7 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

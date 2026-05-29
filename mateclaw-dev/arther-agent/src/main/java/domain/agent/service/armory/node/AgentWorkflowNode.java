@@ -1,19 +1,19 @@
-package cn.zcj.aether.domain.agent.service.armory.node;
+package domain.agent.service.armory.node;
 
-import cn.zcj.aether.domain.agent.model.entity.ArmoryCommandEntity;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentRegisterVO;
-import cn.zcj.aether.domain.agent.model.valobj.enums.AgentTypeEnum;
-import cn.zcj.aether.domain.agent.service.armory.AbstractArmorySupport;
-import cn.zcj.aether.domain.agent.service.armory.factory.DefaultArmoryFactory;
-import cn.zcj.aether.domain.agent.service.armory.node.workflow.LoopAgentNode;
-import cn.zcj.aether.domain.agent.service.armory.node.workflow.ParallelAgentNode;
-import cn.zcj.aether.domain.agent.service.armory.node.workflow.SequentialAgentNode;
+import domain.agent.model.entity.ArmoryCommandEntity;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.model.valobj.AiAgentRegisterVO;
+import domain.agent.model.valobj.enums.AgentTypeEnum;
+import domain.agent.service.armory.AbstractArmorySupport;
+import domain.agent.service.armory.factory.DefaultArmoryFactory;
+import domain.agent.service.armory.node.workflow.LoopAgentNode;
+import domain.agent.service.armory.node.workflow.ParallelAgentNode;
+import domain.agent.service.armory.node.workflow.SequentialAgentNode;
 import cn.bugstack.wrench.design.framework.tree.StrategyHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.List;
 
 //NOTE 15,最后路由到RunnerNode

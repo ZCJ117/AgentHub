@@ -1,15 +1,15 @@
-package cn.zcj.aether.domain.agent.service.armory;
+package domain.agent.service.armory;
 
-import cn.zcj.aether.domain.agent.model.entity.ArmoryCommandEntity;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentRegisterVO;
-import cn.zcj.aether.domain.agent.service.IArmoryService;
-import cn.zcj.aether.domain.agent.service.armory.factory.DefaultArmoryFactory;
+import domain.agent.model.entity.ArmoryCommandEntity;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.model.valobj.AiAgentRegisterVO;
+import domain.agent.service.IArmoryService;
+import domain.agent.service.armory.factory.DefaultArmoryFactory;
 import cn.bugstack.wrench.design.framework.tree.StrategyHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.List;
 
 // NOTE 8,调用IArmoryService的acceptArmoryAgents方法之后，到这里调用实现，遍历AiAgentConfigTableVO，获取策略树 handler

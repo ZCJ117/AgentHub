@@ -7,7 +7,7 @@ const route = useRoute()
 <template>
   <router-view v-slot="{ Component }">
     <Transition name="page-fade" mode="out-in">
-      <component :is="Component" :key="route.path" />
+      <component :is="Component" :key="route.path" v-if="Component" />
     </Transition>
   </router-view>
 </template>

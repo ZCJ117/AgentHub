@@ -1,6 +1,6 @@
-package cn.zcj.aether.domain.agent.model.valobj;
+package domain.agent.model.valobj;
 
-import cn.zcj.aether.domain.agent.model.graph.AgentGraph;
+import domain.agent.model.graph.AgentGraph;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;

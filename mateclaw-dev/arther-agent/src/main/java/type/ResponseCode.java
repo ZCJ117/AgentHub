@@ -1,4 +1,4 @@
-package cn.zcj.aether.types.enums;
+package type;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

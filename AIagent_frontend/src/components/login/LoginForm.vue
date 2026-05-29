@@ -45,7 +45,7 @@ function handleSubmit() {
 
 function handleForgot(e) {
   e.preventDefault()
-  setStatus('演示环境不支持重置密码，请使用 admin / admin 登录。')
+  setStatus('演示环境不支持重置密码，请使用 admin / admin123 登录。')
 }
 </script>
 
@@ -91,7 +91,7 @@ function handleForgot(e) {
 
     <a class="forgot" href="#" @click="handleForgot">忘记密码？</a>
 
-    <p class="footer">演示账号：admin / admin</p>
+    <p class="footer">演示账号：admin / admin123</p>
   </div>
 </template>
 
@@ -101,10 +101,10 @@ function handleForgot(e) {
   background: var(--surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  padding: 40px 36px 36px;
+  padding: 52px 46px 46px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 26px;
   animation: slideUp 0.6s ease both;
   transition: transform 0.35s cubic-bezier(0.25, 0.1, 0.25, 1),
     box-shadow 0.35s cubic-bezier(0.25, 0.1, 0.25, 1);
@@ -116,7 +116,7 @@ function handleForgot(e) {
 }
 
 .card h2 {
-  font-size: 24px;
+  font-size: 30px;
   font-weight: 700;
   letter-spacing: -0.2px;
   color: var(--text);
@@ -125,12 +125,12 @@ function handleForgot(e) {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  margin-bottom: 14px;
+  gap: 9px;
+  margin-bottom: 18px;
 }
 
 .field label {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text);
   letter-spacing: 0.1px;
@@ -138,12 +138,12 @@ function handleForgot(e) {
 
 .field input {
   width: 100%;
-  height: 46px;
-  padding: 0 15px;
+  height: 54px;
+  padding: 0 18px;
   border: 1.5px solid var(--border);
   border-radius: var(--radius-md);
   font-family: var(--font);
-  font-size: 15px;
+  font-size: 17px;
   color: var(--text);
   background: #fff;
   outline: none;
@@ -201,7 +201,7 @@ function handleForgot(e) {
 
 @media (max-width: 767px) {
   .card {
-    padding: 28px 22px;
+    padding: 32px 26px;
   }
 }
 </style>

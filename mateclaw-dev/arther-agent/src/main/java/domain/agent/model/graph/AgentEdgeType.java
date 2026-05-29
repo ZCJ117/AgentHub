@@ -1,7 +1,7 @@
-package cn.zcj.aether.domain.agent.model.graph;
+package domain.agent.model.graph;
 
-import cn.zcj.aether.types.enums.ResponseCode;
-import cn.zcj.aether.types.exception.AppException;
+import type.ResponseCode;
+import type.AppException;
 
 /**
  * 工作流边类型枚举

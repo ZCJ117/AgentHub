@@ -11,10 +11,9 @@ const typeFilter = ref('')
 
 const typeTabs = [
   { name: '', label: '全部' },
+  { name: 'local_cli', label: '本地 CLI' },
   { name: 'react', label: 'ReAct' },
-  { name: 'plan_execute', label: 'Plan-Execute' },
-  { name: 'orchestrator', label: 'Orchestrator' },
-  { name: 'local_cli', label: '本地CLI' }
+  { name: 'plan_execute', label: 'Plan-Execute' }
 ]
 
 onMounted(() => {
@@ -33,6 +32,14 @@ const filteredAgents = computed(() => {
 
 function statusColor(status) {
   return status === 'AVAILABLE' ? 'green' : status === 'BUSY' ? 'orange' : 'gray'
+}
+
+function parseTags(tags) {
+  if (Array.isArray(tags)) return tags
+  if (typeof tags === 'string') {
+    try { return JSON.parse(tags) } catch { return [] }
+  }
+  return []
 }
 </script>
 
@@ -72,19 +79,21 @@ function statusColor(status) {
               </div>
               <div class="agent-desc">{{ agent.description || '暂无描述' }}</div>
               <div class="agent-tags">
-                <NTag v-for="tag in (agent.capabilityTags || [])" :key="tag" size="tiny" :bordered="false">
+                <NTag v-for="tag in parseTags(agent.capabilityTags)" :key="tag" size="tiny" :bordered="false">
                   {{ tag }}
                 </NTag>
               </div>
             </div>
             <div class="agent-card-footer">
-              <NSpace size="6" align="center">
-                <NTag size="tiny" :type="agent.agentType === 'orchestrator' ? 'info' : agent.agentType === 'local_cli' ? 'warning' : 'default'">
-                  {{ agent.agentType }}
+              <NSpace :size="6" align="center">
+                <NTag v-if="agent.agentType === 'local_cli'" size="tiny" type="info">
+                  {{ agent.cliType === 'claude_code' ? 'Claude Code' : agent.cliType === 'open_code' ? 'OpenCode' : agent.cliType || 'local_cli' }}
                 </NTag>
-                <!-- Online status indicator for local_cli agents -->
-                <NTag v-if="agent.agentType === 'local_cli'"
-                      :type="agent.agentStatus === 'AVAILABLE' ? 'success' : 'default'"
+                <NTag v-else size="tiny" :type="agent.agentType === 'react' ? 'default' : 'warning'">
+                  {{ agent.agentType === 'react' ? 'ReAct' : agent.agentType === 'plan_execute' ? 'Plan-Execute' : agent.agentType || 'Agent' }}
+                </NTag>
+                <!-- Online status indicator -->
+                <NTag :type="agent.agentStatus === 'AVAILABLE' ? 'success' : 'default'"
                       size="tiny" round>
                   {{ agent.agentStatus === 'AVAILABLE' ? '在线' : '离线' }}
                 </NTag>

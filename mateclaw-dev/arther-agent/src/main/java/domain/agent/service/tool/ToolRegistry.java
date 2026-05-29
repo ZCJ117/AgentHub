@@ -1,4 +1,4 @@
-package cn.zcj.aether.domain.agent.service.tool;
+package domain.agent.service.tool;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

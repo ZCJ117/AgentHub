@@ -9,6 +9,9 @@ export function regenerateMessage(id, message) {
 }
 
 export function fetchReactions(id) {
+  if (!id || String(id).startsWith('local_')) {
+    return Promise.resolve({})
+  }
   return apiClient.get(`/api/v1/conversations/messages/${id}/reactions`)
 }
 

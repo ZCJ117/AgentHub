@@ -116,10 +116,8 @@ public class ConversationController {
             hasMore = total > limit;
         }
 
-        java.util.List<vip.mate.workspace.conversation.vo.MessageVO> views = messages.stream()
-                .map(m -> vip.mate.workspace.conversation.vo.MessageVO.from(
-                        m, conversationService.parseMessageParts(m), conversationService.renderMessageContent(m)))
-                .toList();
+        java.util.List<vip.mate.workspace.conversation.vo.MessageVO> views =
+                conversationService.toMessageViews(messages);
 
         return R.ok(java.util.Map.of(
                 "messages", views,

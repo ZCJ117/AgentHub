@@ -57,6 +57,7 @@ public class SecurityConfig {
                     "/api/v1/auth/login",
                     "/api/v1/agents/*/chat/stream",
                     "/api/v1/chat/stream",
+                    "/api/v1/chat/test-stream",
                     "/api/v1/chat/*/stop",
                     "/api/v1/setup/**",
                     "/api/v1/channels/webhook/**",

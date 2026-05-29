@@ -1,6 +1,6 @@
-package cn.zcj.aether.domain.agent.service.armory.matter.skills;
+package domain.agent.service.armory.matter.skills;
 
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
 import org.springframework.ai.tool.ToolCallback;
 
 /**

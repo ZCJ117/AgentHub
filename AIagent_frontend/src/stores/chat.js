@@ -119,8 +119,8 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       const data = await fetchMessages(convId, { limit: 50 })
-      const records = data?.records || []
-      messages.value = records.reverse()
+      const msgs = data?.messages || []
+      messages.value = msgs
       hasMoreHistory.value = data?.hasMore || false
       nextBeforeId.value = data?.nextBeforeId || null
     } catch (err) {
@@ -136,8 +136,8 @@ export const useChatStore = defineStore('chat', () => {
         beforeId: nextBeforeId.value,
         limit: 50
       })
-      const records = data?.records || []
-      messages.value = [...records.reverse(), ...messages.value]
+      const msgs = data?.messages || []
+      messages.value = [...msgs, ...messages.value]
       hasMoreHistory.value = data?.hasMore || false
       nextBeforeId.value = data?.nextBeforeId || null
     } catch (err) {
@@ -167,7 +167,7 @@ export const useChatStore = defineStore('chat', () => {
     const MAX_STREAM_TIME = 90_000      // 90s total max
 
     let contentTimeoutId = setTimeout(() => {
-      if (!contentReceived && isStreaming.value) {
+      if (!contentReceived && isStreaming.value && agentStreams.value.size === 0) {
         streamError.value = 'Agent 响应超时，请重试'
         updateMessage(assistantId, { status: 'error' })
         cleanupAgentStreams('error')
@@ -190,7 +190,7 @@ export const useChatStore = defineStore('chat', () => {
       contentReceived = true
       clearTimeout(contentTimeoutId)
       contentTimeoutId = setTimeout(() => {
-        if (isStreaming.value) {
+        if (isStreaming.value && agentStreams.value.size === 0) {
           streamError.value = 'Agent 响应超时，请重试'
           updateMessage(assistantId, { status: 'error' })
           cleanupAgentStreams('error')
@@ -315,6 +315,9 @@ export const useChatStore = defineStore('chat', () => {
         tokenUsage: data.tokenUsage || null
       })
 
+      // Defensive: clean up any sub-agent streams that didn't get agent_message_complete
+      cleanupAgentStreams('completed')
+
       // Fallback: if content_delta events were lost, use the full
       // content from the done payload so the bubble isn't blank
       if (data.content) {
@@ -338,6 +341,7 @@ export const useChatStore = defineStore('chat', () => {
           c => String(c.conversationId) === String(conversationId.value)
         )
         if (conv && conv.id != null) {
+          convStore.setActive(conv.id)
           router.replace(`/chat/${conv.id}`)
         }
       }

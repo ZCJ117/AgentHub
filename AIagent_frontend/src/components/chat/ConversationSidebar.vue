@@ -105,9 +105,9 @@ function contextMenuOptions(conv) {
 }
 
 function handleContextMenu(key, conv) {
-  if (key === 'pin') handlePin(conv.id)
-  else if (key === 'archive') handleArchive(conv.id)
-  else if (key === 'delete') handleDelete(conv.id)
+  if (key === 'pin') handlePin(conv.conversationId)
+  else if (key === 'archive') handleArchive(conv.conversationId)
+  else if (key === 'delete') handleDelete(conv.conversationId)
 }
 </script>
 
@@ -155,7 +155,7 @@ function handleContextMenu(key, conv) {
           :key="conv.id"
           class="conv-item"
           :class="{
-            active: conv.id === convStore.activeId,
+            active: conv.conversationId === convStore.activeId || String(conv.id) === String(convStore.activeId),
             pinned: conv.pinnedAt
           }"
           @click="selectConversation(conv)"

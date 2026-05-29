@@ -1,4 +1,4 @@
-package cn.zcj.aether.domain.agent.model.valobj.enums;
+package domain.agent.model.valobj.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

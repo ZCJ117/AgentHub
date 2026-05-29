@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import vip.mate.agent.bridge.AgentBridgeManager;
 import vip.mate.agent.bridge.BridgedAgent;
 import vip.mate.agent.cli.LocalCliProcessManager;
+import vip.mate.agent.repository.AgentMapper;
 import vip.mate.agent.graph.StateGraphReActAgent;
 import vip.mate.agent.graph.NodeStreamingChatHelper;
 import vip.mate.agent.graph.executor.ToolExecutionExecutor;
@@ -116,6 +117,7 @@ public class AgentGraphBuilder {
     private final vip.mate.llm.routing.MediaCaptionService mediaCaptionService;
     private final AgentBridgeManager agentBridgeManager;
     private final LocalCliProcessManager localCliProcessManager;
+    private final AgentMapper agentMapper;
 
     /**
      * Optional audit pipeline. Setter injection (rather than a constructor
@@ -391,9 +393,16 @@ public class AgentGraphBuilder {
      * chat is relayed over stdin/stdout to the local CLI process.
      */
     BridgedAgent buildBridgedAgent(AgentEntity entity) {
-        BridgedAgent agent = new BridgedAgent(conversationService,
-                agentBridgeManager, localCliProcessManager);
-        agent.setCliType(entity.getCliType());
+        BridgedAgent agent;
+        if (entity.getCliType() != null && !entity.getCliType().isBlank()) {
+            // Local process path — agent runs via spawned CLI process on this machine
+            agent = new BridgedAgent(conversationService,
+                    agentBridgeManager, localCliProcessManager, agentMapper);
+            agent.setCliType(entity.getCliType());
+        } else {
+            // WebSocket-only path — agent connects from a remote machine via bridge
+            agent = new BridgedAgent(conversationService, agentBridgeManager, agentMapper);
+        }
         return agent;
     }
 

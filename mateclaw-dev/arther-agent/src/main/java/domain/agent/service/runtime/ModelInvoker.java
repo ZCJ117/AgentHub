@@ -1,4 +1,4 @@
-package cn.zcj.aether.domain.agent.service.runtime;
+package domain.agent.service.runtime;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -174,14 +174,14 @@ public class ModelInvoker {
 
         // IO/网络层错误 → 重试
         if (e instanceof IOException) return true;
-        if (e instanceof java.net.SocketException) return true;
+        if (e instanceof SocketException) return true;
         if (e instanceof java.util.concurrent.TimeoutException) return true;
 
         // SocketException 子类
         Throwable cause = e.getCause();
         while (cause != null) {
-            if (cause instanceof java.net.SocketException) return true;
-            if (cause instanceof java.io.IOException) return true;
+            if (cause instanceof SocketException) return true;
+            if (cause instanceof IOException) return true;
             cause = cause.getCause();
         }
 

@@ -1,6 +1,6 @@
-package cn.zcj.aether.domain.agent.model.valobj.properties;
+package domain.agent.model.valobj.properties;
 
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.PropertySource;

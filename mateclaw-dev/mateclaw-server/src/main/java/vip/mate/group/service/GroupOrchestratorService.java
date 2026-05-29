@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.yaml.snakeyaml.Yaml;
 import reactor.core.publisher.Flux;
@@ -11,6 +12,7 @@ import vip.mate.agent.model.AgentEntity;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * In-process orchestrator service that directly calls the LLM API
@@ -87,6 +89,7 @@ public class GroupOrchestratorService {
             var body = Map.of(
                     "model", model,
                     "stream", true,
+                    "thinking", Map.of("type", "disabled"),
                     "messages", List.of(
                             Map.of("role", "system", "content", systemPrompt),
                             Map.of("role", "user", "content", prompt)
@@ -94,13 +97,22 @@ public class GroupOrchestratorService {
             );
 
             return webClient.post()
+                    .accept(MediaType.TEXT_EVENT_STREAM)
                     .bodyValue(body)
                     .retrieve()
                     .bodyToFlux(String.class)
-                    .filter(line -> line.startsWith("data: ") && !line.contains("[DONE]"))
+                    .doOnNext(raw -> log.debug("Orchestrator SSE raw: {}", raw))
+                    .concatMap(raw -> Flux.fromStream(
+                            Stream.of(raw.split("\n\n"))
+                                    .filter(block -> !block.isBlank())
+                    ))
+                    .filter(line -> {
+                        boolean match = line.startsWith("{") && !line.contains("[DONE]");
+                        return match;
+                    })
                     .map(line -> {
                         try {
-                            var node = objectMapper.readTree(line.substring(6));
+                            var node = objectMapper.readTree(line);
                             var choices = node.path("choices");
                             if (choices.isArray() && choices.size() > 0) {
                                 var delta = choices.get(0).path("delta");
@@ -109,6 +121,7 @@ public class GroupOrchestratorService {
                             }
                             return "";
                         } catch (Exception e) {
+                            log.debug("Orchestrator SSE parse failed: {}", e.getMessage());
                             return "";
                         }
                     })

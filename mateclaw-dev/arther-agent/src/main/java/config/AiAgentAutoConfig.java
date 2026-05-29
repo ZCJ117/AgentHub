@@ -1,15 +1,15 @@
-package cn.zcj.aether.config;
+package config;
 
-import cn.zcj.aether.domain.agent.model.valobj.properties.AiAgentAutoConfigProperties;
-import cn.zcj.aether.domain.agent.service.IArmoryService;
-import com.alibaba.fastjson.JSON;
+import domain.agent.model.valobj.properties.AiAgentAutoConfigProperties;
+import domain.agent.service.IArmoryService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.annotation.Configuration;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.ArrayList;
 
 // NOTE 6,执行onApplicationEvent方法，调用IArmoryService的acceptArmoryAgents方法
@@ -25,11 +25,13 @@ public class AiAgentAutoConfig implements ApplicationListener<ApplicationReadyEv
     @Resource
     private IArmoryService armoryService;
 
+    @Resource
+    private ObjectMapper objectMapper;
+
     @Override
     public void onApplicationEvent(ApplicationReadyEvent event) {
         try {
-            // NOTE 将AiAgentAutoConfigProperties.getTables()传递给IArmoryService，用于自动装配AI Agent
-            log.info("Ai Agent 智能体装配 {}", JSON.toJSONString(aiAgentAutoConfigProperties.getTables().values()));
+            log.info("Ai Agent 智能体装配 {}", objectMapper.writeValueAsString(aiAgentAutoConfigProperties.getTables().values()));
 
             armoryService.acceptArmoryAgents(new ArrayList<>(aiAgentAutoConfigProperties.getTables().values()));
         } catch (Exception e) {

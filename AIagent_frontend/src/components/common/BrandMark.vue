@@ -8,7 +8,7 @@ defineProps({
 <template>
   <div class="brand">
     <div :class="['brand-mark', `brand-mark--${size}`]" aria-hidden="true">AI</div>
-    <span v-if="showName" class="brand-name">AI Agent Scaffold</span>
+    <span v-if="showName" class="brand-name">AI Agent teams</span>
   </div>
 </template>
 

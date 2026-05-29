@@ -1,4 +1,4 @@
-package cn.zcj.aether.config;
+package config;
 
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;

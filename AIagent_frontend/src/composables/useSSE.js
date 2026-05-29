@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, getCurrentInstance } from 'vue'
 
 export function useSSE() {
   const isConnected = ref(false)
@@ -8,6 +8,11 @@ export function useSSE() {
   let abortController = null
   let reader = null
   const listeners = new Map()
+
+  // Only register lifecycle hook when inside a component setup context
+  if (getCurrentInstance()) {
+    onUnmounted(() => { disconnect() })
+  }
 
   function on(eventType, callback) {
     if (!listeners.has(eventType)) {
@@ -50,6 +55,7 @@ export function useSSE() {
 
     try {
       const response = await fetchFn(abortController.signal)
+      console.log('[SSE] response status:', response.status, 'type:', response.headers.get('content-type'))
 
       if (!response.ok) {
         throw new Error(`SSE connection failed: ${response.status}`)
@@ -58,7 +64,7 @@ export function useSSE() {
       const contentType = response.headers.get('content-type') || ''
       if (contentType.includes('application/json')) {
         const json = await response.json()
-        emit('done', json)
+          emit('done', json)
         return
       }
 
@@ -68,7 +74,7 @@ export function useSSE() {
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) { console.log('[SSE] stream done'); break }
 
         buffer += decoder.decode(value, { stream: true })
 
@@ -94,6 +100,7 @@ export function useSSE() {
           if (dataStr) {
             try {
               const data = JSON.parse(dataStr)
+              console.log('[SSE] evt:', eventType)
               emit(eventType, data)
             } catch {
               emit(eventType, dataStr)
@@ -102,6 +109,7 @@ export function useSSE() {
         }
       }
     } catch (err) {
+      console.log('[SSE] catch:', err.name, err.message)
       if (err.name === 'AbortError') {
         reconnectAttempts = 0
       } else {
@@ -120,6 +128,7 @@ export function useSSE() {
         reconnectAttempts = 0
       }
     } finally {
+      console.log('[SSE] finally, isConnected:', isConnected.value)
       isConnected.value = false
       reader = null
     }
@@ -132,10 +141,6 @@ export function useSSE() {
     }
     isConnected.value = false
   }
-
-  onUnmounted(() => {
-    disconnect()
-  })
 
   return { isConnected, error, lastEventId, on, emit, connect, disconnect }
 }

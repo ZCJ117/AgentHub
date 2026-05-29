@@ -1,6 +1,6 @@
-package cn.zcj.aether.domain.agent.service.context;
+package domain.agent.service.context;
 
-import cn.zcj.aether.domain.agent.service.runtime.TurnMessage;
+import domain.agent.service.runtime.TurnMessage;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +11,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.*;
 
 /**

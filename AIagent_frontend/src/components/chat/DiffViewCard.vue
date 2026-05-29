@@ -17,7 +17,7 @@ const emit = defineEmits(['apply', 'reject'])
         <NButton size="small" @click="emit('reject', message.id)">拒绝</NButton>
       </NSpace>
     </div>
-    <NCode :code="message.content" language="diff" />
+    <NCode :code="String(message.content || '')" language="diff" />
   </div>
 </template>
 

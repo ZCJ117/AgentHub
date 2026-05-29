@@ -1,4 +1,4 @@
-package cn.zcj.aether.domain.agent.model.graph;
+package domain.agent.model.graph;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

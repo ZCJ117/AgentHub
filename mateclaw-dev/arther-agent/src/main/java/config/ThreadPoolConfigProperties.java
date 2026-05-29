@@ -1,4 +1,4 @@
-package cn.zcj.aether.config;
+package config;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;

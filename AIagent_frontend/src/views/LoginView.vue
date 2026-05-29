@@ -33,20 +33,52 @@ async function handleLogin({ username, password }) {
 </script>
 
 <template>
-  <div class="login-view">
-    <HeroSection />
-    <LoginForm
-      :error="error"
-      :loading="loading"
-      @submit="handleLogin"
-    />
+  <div class="login-page-wrapper">
+    <main class="page">
+      <HeroSection />
+      <section class="login-panel" aria-label="登录">
+        <LoginForm
+          :error="error"
+          :loading="loading"
+          @submit="handleLogin"
+        />
+      </section>
+    </main>
   </div>
 </template>
 
 <style scoped>
-.login-view {
-  display: flex;
+.login-page-wrapper {
   min-height: 100vh;
-  background: var(--bg-primary, #f5f5f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f7;
+  padding: 24px;
+}
+
+.page {
+  width: min(1100px, 100%);
+  display: grid;
+  grid-template-columns: 1.22fr 0.78fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.login-panel {
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 767px) {
+  .login-page-wrapper {
+    padding: 16px;
+    align-items: flex-start;
+  }
+
+  .page {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
 }
 </style>

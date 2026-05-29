@@ -98,10 +98,12 @@ public class AgentMentionDispatcher {
                 if (!semaphore.tryAcquire(180, TimeUnit.SECONDS)) {
                     log.warn("[Dispatcher] Semaphore timeout for agent={}", agentName);
                     broadcastAgentError(conversationId, agentName, "等待槽位超时");
+                    completeAndBroadcastDoneIfLast(conversationId);
                     return;
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                completeAndBroadcastDoneIfLast(conversationId);
                 return;
             }
 
@@ -130,6 +132,7 @@ public class AgentMentionDispatcher {
             if (!spawned && !processManager.isRunning(agentIdStr)) {
                 log.error("[Dispatcher] Failed to spawn CLI for agent={}", agentName);
                 broadcastAgentError(conversationId, agentName, "Agent CLI 启动失败");
+                completeAndBroadcastDoneIfLast(conversationId);
                 return;
             }
 
@@ -203,6 +206,7 @@ public class AgentMentionDispatcher {
         } catch (Exception e) {
             log.error("[Dispatcher] Failed to spawn agent {}: {}", agentName, e.getMessage());
             broadcastAgentError(conversationId, agentName, e.getMessage());
+            completeAndBroadcastDoneIfLast(conversationId);
         }
     }
 
@@ -212,6 +216,16 @@ public class AgentMentionDispatcher {
                 "status", "error",
                 "error", error
         ));
+    }
+
+    private void completeAndBroadcastDoneIfLast(String conversationId) {
+        ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
+        if (cr.allDone()) {
+            streamTracker.broadcastObject(conversationId, "done", Map.of(
+                    "conversationId", conversationId,
+                    "status", "completed"
+            ));
+        }
     }
 
     /** Reset dispatch tracking for a new turn */

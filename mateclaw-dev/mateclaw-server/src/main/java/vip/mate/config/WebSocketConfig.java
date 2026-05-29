@@ -39,12 +39,14 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     private final TalkModeWebSocketHandler talkModeHandler;
     private final AgentBridgeWsHandler agentBridgeHandler;
+    private final AgentBridgeHandshakeInterceptor bridgeHandshakeInterceptor;
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
         registry.addHandler(talkModeHandler, "/api/v1/talk/ws")
                 .setAllowedOrigins("*");
         registry.addHandler(agentBridgeHandler, "/api/v1/agent-bridge/ws")
+                .addInterceptors(bridgeHandshakeInterceptor)
                 .setAllowedOrigins("*");
     }
 

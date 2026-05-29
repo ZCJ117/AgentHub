@@ -1,8 +1,8 @@
-package cn.zcj.aether.domain.agent.service.armory;
+package domain.agent.service.armory;
 
-import cn.zcj.aether.domain.agent.model.entity.ArmoryCommandEntity;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentRegisterVO;
-import cn.zcj.aether.domain.agent.service.armory.factory.DefaultArmoryFactory;
+import domain.agent.model.entity.ArmoryCommandEntity;
+import domain.agent.model.valobj.AiAgentRegisterVO;
+import domain.agent.service.armory.factory.DefaultArmoryFactory;
 import cn.bugstack.wrench.design.framework.tree.AbstractMultiThreadStrategyRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,7 +11,7 @@ import org.springframework.beans.factory.support.BeanDefinitionBuilder;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.ApplicationContext;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 

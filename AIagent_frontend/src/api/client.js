@@ -29,7 +29,7 @@ apiClient.interceptors.response.use(
     if (data && (data.code === 200 || data.code === '0000')) {
       return data.data
     }
-    const err = new Error(data?.message || 'Request failed')
+    const err = new Error(data?.msg || data?.message || 'Request failed')
     err.code = data?.code
     return Promise.reject(err)
   },

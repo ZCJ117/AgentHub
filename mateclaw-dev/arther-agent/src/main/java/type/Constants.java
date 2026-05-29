@@ -1,4 +1,4 @@
-package cn.zcj.aether.types.common;
+package type;
 
 public class Constants {
 

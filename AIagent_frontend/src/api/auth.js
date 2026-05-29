@@ -13,5 +13,7 @@ export function updateProfile(body) {
 }
 
 export function changePassword(id, oldPassword, newPassword) {
-  return apiClient.put(`/api/v1/auth/users/${id}/password`, { oldPassword, newPassword })
+  return apiClient.put(`/api/v1/auth/users/${id}/password`, null, {
+    params: { oldPassword, newPassword }
+  })
 }

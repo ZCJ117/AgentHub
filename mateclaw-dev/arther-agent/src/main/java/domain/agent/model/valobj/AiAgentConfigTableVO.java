@@ -1,4 +1,4 @@
-package cn.zcj.aether.domain.agent.model.valobj;
+package domain.agent.model.valobj;
 
 import lombok.Data;
 

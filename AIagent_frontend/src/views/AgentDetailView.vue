@@ -53,9 +53,9 @@ const savingTools = ref(false)
 const stats = ref(null)
 const loadingStats = ref(false)
 
-const agentTypes = [
-  { label: 'Claude Code', value: 'claude_code' },
-  { label: 'OpenCode', value: 'open_code' }
+const cliTypeOptions = [
+  { label: 'Claude Code (claude)', value: 'claude_code' },
+  { label: 'OpenCode (opencode)', value: 'open_code' }
 ]
 
 async function loadSkillsTab() {
@@ -285,8 +285,8 @@ async function handleAvatarUpload(e) {
             <div class="config-form">
               <NSpace vertical :size="12">
                 <div>
-                  <label>CLI 类型</label>
-                  <NSelect v-model:value="cliType" :options="agentTypes" placeholder="选择 CLI 类型" />
+                  <label>本地 CLI 类型</label>
+                  <NSelect v-model:value="cliType" :options="cliTypeOptions" placeholder="选择本地 CLI 类型" />
                 </div>
                 <NCard v-if="agentType === 'local_cli'" title="连接信息" size="small" style="margin-top:12px">
                   <NSpace vertical>

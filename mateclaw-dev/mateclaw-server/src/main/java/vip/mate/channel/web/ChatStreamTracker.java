@@ -622,9 +622,37 @@ public class ChatStreamTracker {
                     }
                 }
             }
-            // done events do not flow through eventRelays; async_task_* should
-            // also short-circuit since relays exist for delta-style streaming
-            // events, not lifecycle markers.
+            // Direct SSE write — bypasses broken SseEmitter for reliable delivery.
+            // Without this, the terminal "done" event may sit in SseEmitter's
+            // internal buffer and never reach the browser before the frontend's
+            // 30-second content timeout fires, permanently stranding the UI in
+            // "生成中..." state.
+            jakarta.servlet.ServletOutputStream directOut = directSseOutMap.get(conversationId);
+            if (directOut != null) {
+                try {
+                    String sse = "event: " + eventName + "\ndata: " + jsonData + "\n\n";
+                    directOut.write(sse.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    directOut.flush();
+                } catch (Exception e) {
+                    log.debug("Direct SSE write failed for {} ({}): {}",
+                            conversationId, eventName, e.getMessage());
+                    directSseOutMap.remove(conversationId);
+                }
+            }
+
+            // Event relays: forward to registered listeners
+            List<java.util.function.BiConsumer<String, String>> relays = eventRelays.get(conversationId);
+            if (relays != null) {
+                for (var relay : relays) {
+                    try {
+                        relay.accept(eventName, jsonData);
+                    } catch (Exception e) {
+                        log.debug("Event relay error for {} ({}): {}",
+                                conversationId, eventName, e.getMessage());
+                    }
+                }
+            }
+
             return;
         }
 

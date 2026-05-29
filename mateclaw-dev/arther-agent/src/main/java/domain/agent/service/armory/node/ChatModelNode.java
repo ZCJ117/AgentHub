@@ -1,17 +1,17 @@
-package cn.zcj.aether.domain.agent.service.armory.node;
+package domain.agent.service.armory.node;
 
-import cn.zcj.aether.domain.agent.model.entity.ArmoryCommandEntity;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentRegisterVO;
-import cn.zcj.aether.domain.agent.service.armory.AbstractArmorySupport;
-import cn.zcj.aether.domain.agent.service.armory.factory.DefaultArmoryFactory;
-import cn.zcj.aether.domain.agent.service.armory.matter.mcp.client.TooMcpCreateService;
-import cn.zcj.aether.domain.agent.service.armory.matter.mcp.client.factory.DefaultMcpClientFactory;
-import cn.zcj.aether.domain.agent.service.armory.matter.skills.ToolSkillsCreateService;
-import cn.zcj.aether.domain.agent.service.tool.McpToolAdapter;
-import cn.zcj.aether.domain.agent.service.tool.SkillsToolAdapter;
-import cn.zcj.aether.domain.agent.service.tool.Tool;
-import cn.zcj.aether.domain.agent.service.tool.ToolRegistry;
+import domain.agent.model.entity.ArmoryCommandEntity;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.model.valobj.AiAgentRegisterVO;
+import domain.agent.service.armory.AbstractArmorySupport;
+import domain.agent.service.armory.factory.DefaultArmoryFactory;
+import domain.agent.service.armory.matter.mcp.client.TooMcpCreateService;
+import domain.agent.service.armory.matter.mcp.client.factory.DefaultMcpClientFactory;
+import domain.agent.service.armory.matter.skills.ToolSkillsCreateService;
+import domain.agent.service.tool.McpToolAdapter;
+import domain.agent.service.tool.SkillsToolAdapter;
+import domain.agent.service.tool.Tool;
+import domain.agent.service.tool.ToolRegistry;
 import cn.bugstack.wrench.design.framework.tree.StrategyHandler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.model.ChatModel;
@@ -21,7 +21,7 @@ import org.springframework.ai.openai.api.OpenAiApi;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 

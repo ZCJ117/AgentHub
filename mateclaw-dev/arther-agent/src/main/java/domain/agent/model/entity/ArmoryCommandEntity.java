@@ -1,6 +1,6 @@
-package cn.zcj.aether.domain.agent.model.entity;
+package domain.agent.model.entity;
 
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

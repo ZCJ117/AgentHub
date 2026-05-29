@@ -7,7 +7,7 @@ import OrbitRing from '@/components/common/OrbitRing.vue'
 import ParticleGrid from '@/components/common/ParticleGrid.vue'
 import FeatureItem from './FeatureItem.vue'
 
-const orbitBadges = ['LLM', 'RAG', 'API', 'MCP', '工具', '工作流']
+const orbitBadges = ['Claude', 'OpenCode', 'GPT', 'MCP', '编排', '部署']
 </script>
 
 <template>
@@ -20,16 +20,16 @@ const orbitBadges = ['LLM', 'RAG', 'API', 'MCP', '工具', '工作流']
       <BrandMark size="md" class="hero-brand-float" />
     </div>
 
-    <BlurRevealText as="h1" text="你的智能助手" :stagger-ms="55" />
+    <BlurRevealText as="h1" text="多 Agent 协同工作平台" :stagger-ms="55" />
 
     <ScrollReveal>
       <p class="hero-sub">
-        多模型、多工具、多工作流 — 一个能帮你把事做完的企业级 AI Agent 平台。
+        像使用飞书/微信一样，在一个对话里 @ 多个 AI Agent，自动拆解任务、并行协作、产出交付。
       </p>
     </ScrollReveal>
 
     <StaggerReveal>
-      <FeatureItem title="灵活的工作流编排" description="顺序、并行、循环 — 按需组合 Agent 与工具调用链路">
+      <FeatureItem title="多 Agent 协同" description="Orchestrator 自动拆解任务，多 Agent 并行执行，智能聚合结果">
         <template #icon>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="9 11 12 14 22 4" />
@@ -37,7 +37,7 @@ const orbitBadges = ['LLM', 'RAG', 'API', 'MCP', '工具', '工作流']
           </svg>
         </template>
       </FeatureItem>
-      <FeatureItem title="全链路可观测" description="对话、工具调用、成本 — 每一步都可追溯与审计">
+      <FeatureItem title="产物闭环管理" description="从对话生成到预览编辑到一键部署，全链路可追溯">
         <template #icon>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
@@ -69,7 +69,7 @@ const orbitBadges = ['LLM', 'RAG', 'API', 'MCP', '工具', '工作流']
 .hero {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 34px;
   padding-right: 20px;
   position: relative;
 }
@@ -87,7 +87,7 @@ const orbitBadges = ['LLM', 'RAG', 'API', 'MCP', '工具', '工作流']
 }
 
 .hero-brand-wrap {
-  margin-bottom: -8px;
+  margin-bottom: -6px;
 }
 
 .hero-brand-float {
@@ -96,7 +96,7 @@ const orbitBadges = ['LLM', 'RAG', 'API', 'MCP', '工具', '工作流']
 }
 
 .hero h1 {
-  font-size: 36px;
+  font-size: 46px;
   font-weight: 700;
   line-height: 1.18;
   letter-spacing: -0.3px;
@@ -104,7 +104,7 @@ const orbitBadges = ['LLM', 'RAG', 'API', 'MCP', '工具', '工作流']
 }
 
 .hero-sub {
-  font-size: 17px;
+  font-size: 20px;
   line-height: 1.6;
   color: var(--text-secondary);
   max-width: 42ch;
@@ -166,11 +166,11 @@ const orbitBadges = ['LLM', 'RAG', 'API', 'MCP', '工具', '工作流']
   }
 
   .hero h1 {
-    font-size: 28px;
+    font-size: 32px;
   }
 
   .hero-sub {
-    font-size: 15px;
+    font-size: 16px;
     max-width: 38ch;
   }
 

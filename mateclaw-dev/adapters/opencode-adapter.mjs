@@ -40,25 +40,29 @@ rl.on('line', (line) => {
             const message = frame.payload?.message || '';
             const conversationId = frame.payload?.conversationId || 'default';
 
-            const args = ['-p', message];
+            const args = ['run', message, '--format', 'json', '--print-logs'];
 
             const env = { ...process.env };
             if (systemPrompt) {
                 env.OPENCODE_SYSTEM_PROMPT = systemPrompt;
             }
 
-            const child = spawn('opencode', args, {
+            // Create temp log files synchronously so they exist before spawn and terminal open
+            const ts = Date.now();
+            const logFile = path.join(os.tmpdir(), `agenthub-opencode-${ts}.log`);
+            const cleanLogFile = path.join(os.tmpdir(), `agenthub-opencode-clean-${ts}.log`);
+            fs.writeFileSync(logFile, '');
+            fs.writeFileSync(cleanLogFile, '﻿'); // UTF-8 BOM for Windows PowerShell compatibility
+            process.stderr.write(`[opencode-adapter] Log file: ${logFile}\n`);
+
+            const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+            const cleanLogStream = fs.createWriteStream(cleanLogFile, { flags: 'a' });
+
+            const opencodeBin = process.env.OPENCODE_BIN || 'opencode';
+            const child = spawn(opencodeBin, args, {
                 env,
                 stdio: ['ignore', 'pipe', 'pipe']
             });
-
-            // Create temp log files — raw JSON for debugging, clean text for the terminal window
-            const logFile = path.join(os.tmpdir(), `agenthub-opencode-${Date.now()}.log`);
-            const cleanLogFile = path.join(os.tmpdir(), `agenthub-opencode-clean-${Date.now()}.log`);
-            const logStream = fs.createWriteStream(logFile);
-            const cleanLogStream = fs.createWriteStream(cleanLogFile);
-            cleanLogStream.write('﻿'); // UTF-8 BOM for Windows PowerShell compatibility
-            process.stderr.write(`[opencode-adapter] Log file: ${logFile}\n`);
 
             function sendText(delta) {
                 send('text', { delta });
@@ -90,6 +94,14 @@ rl.on('line', (line) => {
 
                     try {
                         switch (event.type) {
+                            case 'text':
+                                if (event.part?.text) {
+                                    sendText(event.part.text);
+                                }
+                                break;
+                            case 'step_start':
+                            case 'step_finish':
+                                break;
                             case 'stream_event':
                                 // Partial-JSON rendering events
                                 if (event.delta?.text) {

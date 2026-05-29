@@ -24,7 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (stored) {
       try {
         const u = JSON.parse(stored)
-        userId.value = u.userId
+        userId.value = u.id || u.userId
         username.value = u.username
         nickname.value = u.nickname
         role.value = u.role
@@ -40,12 +40,12 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await loginApi(usernameInput.trim(), password)
       setToken(data.token)
       localStorage.setItem('ai_agent_user', JSON.stringify({
-        userId: data.userId,
+        userId: data.id,
         username: data.username,
         nickname: data.nickname,
         role: data.role
       }))
-      userId.value = data.userId
+      userId.value = data.id
       username.value = data.username
       nickname.value = data.nickname
       role.value = data.role

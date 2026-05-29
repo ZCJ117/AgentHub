@@ -1,4 +1,4 @@
-package cn.zcj.aether.domain.agent.service.tool;
+package domain.agent.service.tool;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

@@ -35,6 +35,9 @@ public class LocalCliProcessManager {
     @Value("${mateclaw.local-cli.adapters-dir:adapters}")
     private String adaptersDir;
 
+    @Value("${mateclaw.local-cli.opencode-bin:opencode}")
+    private String opencodeBin;
+
     @Value("${mateclaw.local-cli.timeout-seconds:300}")
     private int timeoutSeconds;
 
@@ -110,6 +113,7 @@ public class LocalCliProcessManager {
             pb.environment().put("AGENT_ID", agentId);
             pb.environment().put("AGENT_NAME", agentName);
             pb.environment().put("SYSTEM_PROMPT", systemPrompt != null ? systemPrompt : "");
+            pb.environment().put("OPENCODE_BIN", opencodeBin);
             if (claudeMdPath != null && !claudeMdPath.isBlank()) {
                 pb.environment().put("CLAUDE_MD_PATH", claudeMdPath);
             }

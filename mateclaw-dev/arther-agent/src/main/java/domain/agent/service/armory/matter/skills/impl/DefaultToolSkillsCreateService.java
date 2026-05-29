@@ -1,7 +1,7 @@
-package cn.zcj.aether.domain.agent.service.armory.matter.skills.impl;
+package domain.agent.service.armory.matter.skills.impl;
 
-import cn.zcj.aether.domain.agent.model.valobj.AiAgentConfigTableVO;
-import cn.zcj.aether.domain.agent.service.armory.matter.skills.ToolSkillsCreateService;
+import domain.agent.model.valobj.AiAgentConfigTableVO;
+import domain.agent.service.armory.matter.skills.ToolSkillsCreateService;
 import lombok.extern.slf4j.Slf4j;
 import org.springaicommunity.agent.tools.SkillsTool;
 import org.springframework.ai.tool.ToolCallback;

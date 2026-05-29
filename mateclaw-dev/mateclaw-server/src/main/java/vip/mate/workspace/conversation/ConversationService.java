@@ -824,9 +824,7 @@ public class ConversationService {
     }
 
     public List<MessageVO> listMessageViews(String conversationId) {
-        return listMessages(conversationId).stream()
-                .map(message -> MessageVO.from(message, parseMessageParts(message), renderMessageContent(message)))
-                .toList();
+        return toMessageViews(listMessages(conversationId));
     }
 
     /**
@@ -1413,6 +1411,30 @@ public class ConversationService {
         }
     }
 
+    private Map<Long, String> buildAgentNameMap(List<MessageEntity> messages) {
+        Set<Long> agentIds = messages.stream()
+                .map(MessageEntity::getSenderAgentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (agentIds.isEmpty()) {
+            return Map.of();
+        }
+        return agentMapper.selectBatchIds(agentIds).stream()
+                .collect(Collectors.toMap(AgentEntity::getId, AgentEntity::getName));
+    }
+
+    public List<MessageVO> toMessageViews(List<MessageEntity> messages) {
+        Map<Long, String> nameMap = buildAgentNameMap(messages);
+        return messages.stream()
+                .map(m -> MessageVO.from(m, parseMessageParts(m), renderMessageContent(m)))
+                .peek(vo -> {
+                    if (vo.getSenderAgentId() != null) {
+                        vo.setSenderAgentName(nameMap.get(vo.getSenderAgentId()));
+                    }
+                })
+                .toList();
+    }
+
     /**
      * Build the reply chain for a message by walking replyToId links backward.
      * Capped at 50 depth with cycle detection.
@@ -1431,22 +1453,6 @@ public class ConversationService {
             cursor = msg.getReplyToId();
         }
         Collections.reverse(chain);
-        // Batch-fetch agent names (reuse existing agentMapper pattern)
-        Set<Long> agentIds = chain.stream()
-                .map(MessageEntity::getSenderAgentId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<Long, String> nameMap = agentIds.isEmpty()
-                ? Map.of()
-                : agentMapper.selectBatchIds(agentIds).stream()
-                        .collect(Collectors.toMap(AgentEntity::getId, AgentEntity::getName));
-        return chain.stream()
-                .map(m -> MessageVO.from(m, this.parseMessageParts(m), this.renderMessageContent(m)))
-                .peek(vo -> {
-                    if (vo.getSenderAgentId() != null) {
-                        vo.setSenderAgentName(nameMap.get(vo.getSenderAgentId()));
-                    }
-                })
-                .toList();
+        return toMessageViews(chain);
     }
 }
