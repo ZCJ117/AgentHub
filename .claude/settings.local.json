@@ -77,7 +77,9 @@
       "Bash(opencode run *)",
       "Bash(opencode *)",
       "Bash(xargs grep -l \"implements\")",
-      "Bash(iconv -f GBK -t UTF-8)"
+      "Bash(iconv -f GBK -t UTF-8)",
+      "Bash(tasklist)",
+      "Bash(grep -E \"^\\\\\\\\[INFO\\\\\\\\] BUILD|^\\\\\\\\[INFO\\\\\\\\] Reactor Summary\" -A 10)"
     ]
   }
 }
