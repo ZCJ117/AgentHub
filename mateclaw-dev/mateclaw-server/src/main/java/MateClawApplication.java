@@ -1,5 +1,3 @@
-package vip.mate.server;
-
 import com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor;
 import com.baomidou.mybatisplus.extension.plugins.inner.PaginationInnerInterceptor;
 import org.mybatis.spring.annotation.MapperScan;
@@ -15,22 +13,16 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * @author MateClaw Team
  */
 @SpringBootApplication(scanBasePackages = {"vip.mate.common", "vip.mate.domain", "vip.mate.infra", "vip.mate.server"}, exclude = {
-    // Disable Spring AI MCP Client auto-configuration (lifecycle owned by McpClientManager).
     org.springframework.ai.mcp.client.common.autoconfigure.McpClientAutoConfiguration.class,
     org.springframework.ai.mcp.client.common.autoconfigure.McpToolCallbackAutoConfiguration.class,
     org.springframework.ai.mcp.client.common.autoconfigure.StdioTransportAutoConfiguration.class,
     org.springframework.ai.mcp.client.common.autoconfigure.annotations.McpClientAnnotationScannerAutoConfiguration.class,
     org.springframework.ai.mcp.client.httpclient.autoconfigure.SseHttpClientTransportAutoConfiguration.class,
     org.springframework.ai.mcp.client.httpclient.autoconfigure.StreamableHttpHttpClientTransportAutoConfiguration.class,
-    // DashScopeAgent is the Bailian "Application Agent" (Bailian-hosted prompt+tool app),
-    // not the chat model. We don't use it — model configuration is admin-UI driven and
-    // built by DashScopeChatModelBuilder. Its auto-config strictly requires
-    // spring.ai.dashscope.api-key to be non-empty at startup, which makes the whole
-    // ApplicationContext fail when users deploy via Docker without setting the key.
     com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration.class,
 })
 @EnableScheduling
-@MapperScan({"vip.mate.domain.**.repository", "vip.mate.infra.**.repository"})
+@MapperScan("vip.mate.domain.**.repository")
 public class MateClawApplication {
 
     public static void main(String[] args) {
