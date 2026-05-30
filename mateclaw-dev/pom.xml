@@ -14,6 +14,9 @@
 
     <!-- Reactor modules. Keep plugin-api before consumers for predictable local builds. -->
     <modules>
+        <module>mateclaw-common</module>
+        <module>mateclaw-domain</module>
+        <module>mateclaw-infrastructure</module>
         <module>mateclaw-server</module>
     </modules>
 
@@ -101,6 +104,21 @@
 
             <!-- ==================== MateClaw Modules ==================== -->
             <!-- Internal module dependencies share the same revision-controlled version. -->
+            <dependency>
+                <groupId>vip.mate</groupId>
+                <artifactId>mateclaw-common</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>vip.mate</groupId>
+                <artifactId>mateclaw-domain</artifactId>
+                <version>${revision}</version>
+            </dependency>
+            <dependency>
+                <groupId>vip.mate</groupId>
+                <artifactId>mateclaw-infrastructure</artifactId>
+                <version>${revision}</version>
+            </dependency>
 
             <!-- ==================== Spring AI Alibaba ==================== -->
             <dependency>
