@@ -48,6 +48,13 @@ public class GroupConversationService {
             throw new MateClawException("err.group.min_agents", "群聊至少需要 2 个 Agent");
         }
 
+        // Validate all agent IDs exist
+        for (Long agentId : agentIds) {
+            if (agentMapper.selectById(agentId) == null) {
+                throw new MateClawException("err.group.agent_not_found", "Agent 不存在: " + agentId);
+            }
+        }
+
         // Orchestrator is now handled by arther-agent Agent01 (agents.yml "000001").
         // No local_cli Orchestrator needed — the first user message in the group
         // will be routed to Agent01 via ArtherAgentClient.
@@ -185,6 +192,9 @@ public class GroupConversationService {
         }
         // Add new members
         for (Long agentId : agentIds) {
+            if (agentMapper.selectById(agentId) == null) {
+                throw new MateClawException("err.group.agent_not_found", "Agent 不存在: " + agentId);
+            }
             addMemberInternal(conversationId, agentId, "member");
         }
     }
@@ -198,6 +208,10 @@ public class GroupConversationService {
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("agentId", m.getAgentId());
             map.put("agentName", agent != null ? agent.getName() : "Unknown");
+            map.put("avatarUrl", agent != null ? agent.getAvatarUrl() : null);
+            map.put("capabilityTags", agent != null ? agent.getCapabilityTags() : null);
+            map.put("description", agent != null ? agent.getDescription() : null);
+            map.put("agentStatus", agent != null ? agent.getAgentStatus() : null);
             map.put("memberRole", m.getMemberRole());
             map.put("joinedAt", m.getJoinedAt() != null ? m.getJoinedAt().toString() : null);
             return map;

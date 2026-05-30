@@ -72,41 +72,46 @@ export function useSSE() {
       const decoder = new TextDecoder()
       let buffer = ''
 
+      function processPart(part) {
+        if (!part.trim()) return
+        const lines = part.split('\n')
+        let eventType = 'message'
+        let dataStr = ''
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim()
+          } else if (line.startsWith('data: ')) {
+            dataStr = line.slice(6)
+          } else if (line.startsWith('id: ')) {
+            lastEventId.value = line.slice(4).trim()
+          }
+        }
+
+        if (dataStr) {
+          try {
+            const data = JSON.parse(dataStr)
+            console.log('[SSE] evt:', eventType)
+            emit(eventType, data)
+          } catch {
+            emit(eventType, dataStr)
+          }
+        }
+      }
+
       while (true) {
         const { done, value } = await reader.read()
-        if (done) { console.log('[SSE] stream done'); break }
+        if (done) {
+          console.log('[SSE] stream done')
+          processPart(buffer)
+          break
+        }
 
         buffer += decoder.decode(value, { stream: true })
 
         const parts = buffer.split('\n\n')
         buffer = parts.pop()
-
-        for (const part of parts) {
-          if (!part.trim()) continue
-          const lines = part.split('\n')
-          let eventType = 'message'
-          let dataStr = ''
-
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              eventType = line.slice(7).trim()
-            } else if (line.startsWith('data: ')) {
-              dataStr = line.slice(6)
-            } else if (line.startsWith('id: ')) {
-              lastEventId.value = line.slice(4).trim()
-            }
-          }
-
-          if (dataStr) {
-            try {
-              const data = JSON.parse(dataStr)
-              console.log('[SSE] evt:', eventType)
-              emit(eventType, data)
-            } catch {
-              emit(eventType, dataStr)
-            }
-          }
-        }
+        parts.forEach(processPart)
       }
     } catch (err) {
       console.log('[SSE] catch:', err.name, err.message)

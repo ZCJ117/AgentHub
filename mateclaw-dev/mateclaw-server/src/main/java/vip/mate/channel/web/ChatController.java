@@ -205,6 +205,21 @@ public class ChatController {
             }
         }
 
+        // ---- 非群聊必须指定 agentId，避免 NPE 穿透到 chatStructuredStream ----
+        if (agentId == null) {
+            var conv = conversationService.getByConversationId(conversationId);
+            if (conv == null || !"group".equals(conv.getConversationType())) {
+                try {
+                    sendEvent(emitter, "error", Map.of("message", "请指定 Agent"), conversationId);
+                    sendEvent(emitter, "done", Map.of("status", "completed"), conversationId);
+                } catch (IOException e) {
+                    log.warn("SSE agentId null error send failed: {}", e.getMessage());
+                }
+                emitter.complete();
+                return emitter;
+            }
+        }
+
         // ---- 审批命令拦截：/approve、/deny 走 SSE 流式 replay ----
         String normalizedMsg = message.trim().toLowerCase();
         boolean isApprovalCommand = "/approve".equals(normalizedMsg) || "approve".equals(normalizedMsg);
@@ -1068,7 +1083,7 @@ public class ChatController {
                         })
                         .subscribe(
                                 chunk -> { },
-                                error -> log.debug("SSE stream subscription terminated with error: {}", error.getMessage()),
+                                error -> log.error("SSE stream subscription terminated with error: {}", error.getMessage(), error),
                                 () -> log.debug("SSE stream subscription completed: conversationId={}", conversationId));
 
                 // 将 Disposable 注册到 StreamTracker，以便 stop 端点可以取消它

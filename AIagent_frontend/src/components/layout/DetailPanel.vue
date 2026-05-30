@@ -20,6 +20,14 @@ function statusIcon(status) {
   const map = { completed: '✅', running: '⏳', failed: '❌', pending: '⏸', cancelled: '⏸' }
   return map[status] || '⏸'
 }
+
+function parseMemberTags(tags) {
+  if (Array.isArray(tags)) return tags
+  if (typeof tags === 'string') {
+    try { return JSON.parse(tags) } catch { return [] }
+  }
+  return []
+}
 </script>
 
 <template>
@@ -39,6 +47,28 @@ function statusIcon(status) {
       <div class="info-row">
         <span class="label">消息数</span>
         <span>{{ conversation.messageCount || 0 }}</span>
+      </div>
+    </div>
+
+    <div class="panel-section" v-if="isGroup && conversation.members?.length">
+      <h4>群聊成员 ({{ conversation.members.length }})</h4>
+      <div
+        v-for="member in conversation.members"
+        :key="member.agentId"
+        class="member-item"
+      >
+        <NAvatar :size="32" round :src="member.avatarUrl">
+          {{ (member.agentName || '?')[0] }}
+        </NAvatar>
+        <div class="member-info">
+          <span class="member-name">{{ member.agentName }}</span>
+          <span class="member-desc" v-if="member.description">{{ member.description }}</span>
+          <div class="member-tags" v-if="member.capabilityTags">
+            <NTag v-for="tag in parseMemberTags(member.capabilityTags).slice(0, 3)" :key="tag" size="tiny" :bordered="false">
+              {{ tag }}
+            </NTag>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -171,6 +201,42 @@ function statusIcon(status) {
 
 .assign-status {
   color: #999;
+}
+
+.member-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.member-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.member-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1D1D1F;
+  display: block;
+}
+
+.member-desc {
+  font-size: 12px;
+  color: #999;
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
 }
 
 .panel-empty {

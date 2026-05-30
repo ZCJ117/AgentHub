@@ -29,13 +29,13 @@ function handleCreate() {
   if (props.mode === 'direct') {
     if (!selectedAgentId.value) return
     console.log('[AgentSelector] create direct chat, agentId:', selectedAgentId.value)
-    emit('create', { agentId: Number(selectedAgentId.value), mode: 'direct' })
+    emit('create', { agentId: selectedAgentId.value, mode: 'direct' })
   } else {
     if (selectedAgentIds.value.length < 2) return
     emit('create', {
       mode: 'group',
       title: groupTitle.value,
-      agentIds: selectedAgentIds.value.map(id => Number(id)),
+      agentIds: [...selectedAgentIds.value],
       schedulingMode: 'auto',
       failurePolicy: 'fail_tolerant',
       maxParallelTasks: 4

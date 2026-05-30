@@ -35,11 +35,11 @@ watch(
   () => route.params.conversationId,
   async (id) => {
     const convId = id || null
-    if (String(convStore.activeId) === String(convId)) return
+    if (String(convStore.activeId) === String(convId) && String(chatStore.conversationId) === String(convId)) return
     convStore.setActive(convId)
     await chatStore.initConversation(convId)
     if (convId) {
-      await convStore.loadPinnedMessages(convId)
+      try { await convStore.loadPinnedMessages(convId) } catch {}
     }
   },
   { immediate: true }

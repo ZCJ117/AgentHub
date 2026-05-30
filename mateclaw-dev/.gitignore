@@ -1,0 +1,113 @@
+# 忽略匹配下列规则的Git 提交 V2.1.0
+### gradle ###
+.gradle
+/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+### STS ###
+.settings/
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+rebel.xml
+
+### NetBeans ###
+nbproject/private/
+/build/
+nbbuild/
+/dist/
+nbdist/
+.nb-gradle/
+
+### frontend build artifacts ###
+# Vite's primary output goes to mateclaw-server/.../static; the only thing
+# that lands here is rollup-plugin-visualizer's stats.html when running
+# ANALYZE=1 pnpm build.
+mateclaw-ui/dist/
+
+### maven ###
+target/
+*.war
+*.ear
+*.zip
+*.tar
+*.tar.gz
+
+### logs ####
+/logs/
+mateclaw-server/logs/
+*.log
+
+### temp ignore ###
+*.cache
+*.diff
+*.patch
+*.tmp
+*.java~
+*.properties~
+*.xml~
+
+### system ignore ###
+.DS_Store
+Thumbs.db
+Servers
+.metadata
+upload
+gen_code
+
+### node ###
+node_modules
+pom.xml.versionsBackup
+/server/nacos-server/data
+/server/nacos-server/logs
+
+.flattened-pom.xml
+.cursor
+.gstack/
+
+# mateclaw static build output (do not commit)
+mateclaw-server/src/main/resources/static/
+
+# mateclaw local runtime data (H2 DB, logs, etc. - do not commit)
+mateclaw-server/data/
+/data/
+
+# VitePress build output and cache (do not commit)
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+
+# Astro build cache (do not commit)
+.astro/
+
+# SSL certificates (do not commit)
+deploy/nginx/ssl/*.crt
+deploy/nginx/ssl/*.key
+deploy/nginx/ssl/*.pem
+
+# Deploy env
+deploy/.env
+
+# Claude Code local settings
+CLAUDE.md
+.claude/settings.local.json
+.claude/plans/
+
+# Codex CLI local artifacts
+.codex/
+
+# Sync tooling local state (generated each run; report is intentionally tracked)
+scripts/.*-sync-state.json
+
+# Sandbox / external client work that lives in this directory
+# but should not ship in the repo.
+outputs/

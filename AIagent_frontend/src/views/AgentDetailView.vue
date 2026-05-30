@@ -63,7 +63,7 @@ async function loadSkillsTab() {
   loadingSkills.value = true
   try {
     const [bindings, allSkills] = await Promise.all([
-      fetchAgentSkills(Number(agentId.value)),
+      fetchAgentSkills(agentId.value),
       fetchEnabledSkills()
     ])
     availableSkills.value = Array.isArray(allSkills) ? allSkills : (allSkills?.records || [])
@@ -80,7 +80,7 @@ async function saveSkills() {
   if (agentId.value === 'new') return
   savingSkills.value = true
   try {
-    await updateAgentSkills(Number(agentId.value), selectedSkillIds.value)
+    await updateAgentSkills(agentId.value, selectedSkillIds.value)
   } catch (err) {
     console.warn('Save skills failed:', err)
   } finally {
@@ -93,7 +93,7 @@ async function loadToolsTab() {
   loadingTools.value = true
   try {
     const [bindings, allTools] = await Promise.all([
-      fetchAgentTools(Number(agentId.value)),
+      fetchAgentTools(agentId.value),
       fetchAvailableTools()
     ])
     availableTools.value = Array.isArray(allTools) ? allTools : (allTools?.records || [])
@@ -110,7 +110,7 @@ async function saveTools() {
   if (agentId.value === 'new') return
   savingTools.value = true
   try {
-    await updateAgentTools(Number(agentId.value), selectedToolNames.value)
+    await updateAgentTools(agentId.value, selectedToolNames.value)
   } catch (err) {
     console.warn('Save tools failed:', err)
   } finally {
@@ -122,7 +122,7 @@ async function loadStatsTab() {
   if (agentId.value === 'new' || loadingStats.value) return
   loadingStats.value = true
   try {
-    stats.value = await fetchAgentStats(Number(agentId.value))
+    stats.value = await fetchAgentStats(agentId.value)
   } catch (err) {
     console.warn('Load stats failed:', err)
     stats.value = null
@@ -133,7 +133,7 @@ async function loadStatsTab() {
 
 onMounted(async () => {
   if (agentId.value && agentId.value !== 'new') {
-    const detail = await store.loadDetail(Number(agentId.value))
+    const detail = await store.loadDetail(agentId.value)
     if (detail) {
       name.value = detail.name || ''
       description.value = detail.description || ''
@@ -178,7 +178,7 @@ async function save() {
       const { createAgent } = await import('@/api/agents')
       await createAgent(body)
     } else {
-      await updateAgent(Number(agentId.value), body)
+      await updateAgent(agentId.value, body)
     }
     router.push('/agents')
   } catch (err) {
@@ -190,13 +190,13 @@ async function save() {
 
 async function remove() {
   if (agentId.value !== 'new' && confirm('确定删除此 Agent？')) {
-    await deleteAgent(Number(agentId.value))
+    await deleteAgent(agentId.value)
     router.push('/agents')
   }
 }
 
 const agentDetail = computed(() =>
-  store.detailCache.get(Number(agentId.value)) || {}
+  store.detailCache.get(agentId.value) || {}
 )
 
 const fileInput = ref(null)
@@ -229,8 +229,8 @@ async function handleAvatarUpload(e) {
       throw new Error(errData.message || `上传失败 (${res.status})`)
     }
 
-    store.detailCache.delete(Number(agentId.value))
-    await store.loadDetail(Number(agentId.value))
+    store.detailCache.delete(agentId.value)
+    await store.loadDetail(agentId.value)
   } catch (err) {
     uploadMsg.value = err.message || '头像上传失败'
     setTimeout(() => { uploadMsg.value = '' }, 3000)
@@ -247,7 +247,7 @@ async function handleAvatarUpload(e) {
       <h2>{{ agentId === 'new' ? '新建 Agent' : 'Agent 详情' }}</h2>
     </div>
 
-    <div class="detail-body" v-if="agentId === 'new' || store.detailCache.has(Number(agentId))">
+    <div class="detail-body" v-if="agentId === 'new' || store.detailCache.has(agentId)">
       <div class="detail-sidebar">
         <NAvatar v-if="agentId === 'new'" :size="80" round :src="null" class="avatar">
 	          {{ (name || 'AI')[0] }}

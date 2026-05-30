@@ -44,6 +44,9 @@ public class MemoryRecallTracker {
      */
     @Async
     public void trackRecalls(Long agentId, String userQuery) {
+        if (agentId == null) {
+            return;
+        }
         try {
             // 精确复现 buildSystemPrompt 的注入条件
             List<WorkspaceFileEntity> injectedFiles = workspaceFileMapper.selectList(

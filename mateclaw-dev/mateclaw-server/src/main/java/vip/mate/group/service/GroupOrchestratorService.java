@@ -8,10 +8,12 @@ import org.springframework.http.MediaType;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.yaml.snakeyaml.Yaml;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import vip.mate.agent.model.AgentEntity;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
@@ -89,25 +91,48 @@ public class GroupOrchestratorService {
             var body = Map.of(
                     "model", model,
                     "stream", true,
-                    "thinking", Map.of("type", "disabled"),
+                    "thinking", Map.of("type", "enabled"),
                     "messages", List.of(
                             Map.of("role", "system", "content", systemPrompt),
                             Map.of("role", "user", "content", prompt)
                     )
             );
 
+            AtomicInteger rawChunks = new AtomicInteger(0);
+            AtomicInteger textChunks = new AtomicInteger(0);
+
             return webClient.post()
                     .accept(MediaType.TEXT_EVENT_STREAM)
                     .bodyValue(body)
                     .retrieve()
+                    .onStatus(status -> status.isError(), response ->
+                            response.bodyToMono(String.class)
+                                    .defaultIfEmpty("(empty body)")
+                                    .flatMap(bodyText -> {
+                                        log.error("Orchestrator API error: status={}, body={}",
+                                                response.statusCode(), bodyText);
+                                        return Mono.error(
+                                                new RuntimeException("Orchestrator API " + response.statusCode() + ": " + bodyText));
+                                    }))
                     .bodyToFlux(String.class)
-                    .doOnNext(raw -> log.debug("Orchestrator SSE raw: {}", raw))
+                    .doOnNext(raw -> {
+                        int count = rawChunks.incrementAndGet();
+                        if (count <= 2 || count % 50 == 0) {
+                            log.info("Orchestrator SSE raw chunk #{}: {}", count,
+                                    raw.length() > 200 ? raw.substring(0, 200) + "..." : raw);
+                        }
+                    })
                     .concatMap(raw -> Flux.fromStream(
                             Stream.of(raw.split("\n\n"))
                                     .filter(block -> !block.isBlank())
                     ))
+                    .map(GroupOrchestratorService::stripSsePrefix)
                     .filter(line -> {
                         boolean match = line.startsWith("{") && !line.contains("[DONE]");
+                        if (!match && !line.isBlank() && !line.contains("[DONE]")) {
+                            log.debug("Orchestrator SSE non-JSON line (len={}): {}", line.length(),
+                                    line.length() > 120 ? line.substring(0, 120) + "..." : line);
+                        }
                         return match;
                     })
                     .map(line -> {
@@ -117,7 +142,8 @@ public class GroupOrchestratorService {
                             if (choices.isArray() && choices.size() > 0) {
                                 var delta = choices.get(0).path("delta");
                                 var content = delta.path("content");
-                                return content.isMissingNode() ? "" : content.asText();
+                                if (content.isMissingNode() || content.isNull()) return "";
+                                return content.asText();
                             }
                             return "";
                         } catch (Exception e) {
@@ -126,11 +152,29 @@ public class GroupOrchestratorService {
                         }
                     })
                     .filter(text -> !text.isEmpty())
+                    .doOnNext(text -> textChunks.incrementAndGet())
+                    .doOnComplete(() -> log.info("Orchestrator stream completed: rawChunks={}, textChunks={}",
+                            rawChunks.get(), textChunks.get()))
                     .doOnError(err -> log.error("Orchestrator LLM call failed: {}", err.getMessage()));
         } catch (Exception e) {
             log.error("Orchestrator call failed", e);
             return Flux.error(e);
         }
+    }
+
+    /**
+     * Strip the SSE {@code data:} or {@code data: } prefix from a line,
+     * also trimming any trailing {@code \r}.
+     */
+    static String stripSsePrefix(String line) {
+        String trimmed = line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
+        if (trimmed.startsWith("data: ")) {
+            return trimmed.substring(6);
+        }
+        if (trimmed.startsWith("data:")) {
+            return trimmed.substring(5);
+        }
+        return trimmed;
     }
 
     /**

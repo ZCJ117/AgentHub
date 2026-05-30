@@ -328,6 +328,10 @@ public class ConversationController {
                 Map<String, Object> map = new LinkedHashMap<>();
                 map.put("agentId", m.getAgentId());
                 map.put("agentName", ag != null ? ag.getName() : "Unknown");
+                map.put("avatarUrl", ag != null ? ag.getAvatarUrl() : null);
+                map.put("capabilityTags", ag != null ? ag.getCapabilityTags() : null);
+                map.put("description", ag != null ? ag.getDescription() : null);
+                map.put("agentStatus", ag != null ? ag.getAgentStatus() : null);
                 map.put("memberRole", m.getMemberRole());
                 map.put("joinedAt", m.getJoinedAt() != null ? m.getJoinedAt().toString() : null);
                 return map;
