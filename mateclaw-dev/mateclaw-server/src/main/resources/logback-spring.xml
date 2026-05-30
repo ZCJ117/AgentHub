@@ -57,35 +57,15 @@
         </encoder>
     </appender>
 
-    <!-- ======================== DEBUG 日志文件 ======================== -->
-    <appender name="FILE_DEBUG" class="ch.qos.logback.core.rolling.RollingFileAppender">
-        <file>${LOG_HOME}/${APP_NAME}-debug.log</file>
-        <filter class="ch.qos.logback.classic.filter.LevelFilter">
-            <level>DEBUG</level>
-            <onMatch>ACCEPT</onMatch>
-            <onMismatch>DENY</onMismatch>
-        </filter>
-        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
-            <fileNamePattern>${LOG_HOME}/archive/${APP_NAME}-debug.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
-            <maxFileSize>${MAX_FILE_SIZE}</maxFileSize>
-            <maxHistory>7</maxHistory>
-            <totalSizeCap>500MB</totalSizeCap>
-        </rollingPolicy>
-        <encoder>
-            <pattern>${LOG_PATTERN}</pattern>
-            <charset>UTF-8</charset>
-        </encoder>
-    </appender>
 
     <!-- ======================== Logger 配置 ======================== -->
 
-    <!-- 应用日志（dev/default 环境：DEBUG + 写 debug 文件） -->
+    <!-- 应用日志（dev/default 环境：INFO） -->
     <springProfile name="default | dev">
-        <logger name="vip.mate" level="DEBUG" additivity="false">
+        <logger name="vip.mate" level="INFO" additivity="false">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE_ALL"/>
             <appender-ref ref="FILE_ERROR"/>
-            <appender-ref ref="FILE_DEBUG"/>
         </logger>
     </springProfile>
 
@@ -101,8 +81,9 @@
     <!-- Spring AI -->
     <logger name="org.springframework.ai" level="INFO"/>
 
-    <!-- MyBatis SQL 日志（通过 SLF4J，替代 StdOutImpl） -->
-    <logger name="vip.mate.**.mapper" level="DEBUG"/>
+    <!-- 启动扫描降噪 -->
+    <logger name="vip.mate.skill.workspace.BundledSkillSyncer" level="INFO"/>
+    <logger name="vip.mate.skill.workspace.SkillFileSyncer" level="INFO"/>
 
     <!-- Spring 框架 -->
     <logger name="org.springframework" level="WARN"/>
@@ -111,6 +92,9 @@
 
     <!-- 第三方库降噪 -->
     <logger name="org.apache.http" level="WARN"/>
+    <logger name="org.apache.poi" level="WARN"/>
+    <logger name="org.apache.xmlbeans" level="WARN"/>
+    <logger name="org.openxmlformats" level="WARN"/>
     <logger name="com.zaxxer.hikari" level="INFO"/>
     <logger name="io.netty" level="WARN"/>
 

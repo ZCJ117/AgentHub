@@ -18,11 +18,7 @@
     <description>MateClaw - Java+Vue Personal AI Assistant powered by Spring AI Alibaba</description>
 
     <dependencies>
-        <!-- ===== MateClaw Plugin API ===== -->
-        <dependency>
-            <groupId>vip.mate</groupId>
-            <artifactId>mateclaw-plugin-api</artifactId>
-        </dependency>
+
 
 
         <!-- ===== Web MVC, excluding WebFlux to keep servlet mode ===== -->
@@ -443,6 +439,7 @@
                          depending on the JVM's startup hardening, making tests pass on one
                          machine and fail on another. byte-buddy-agent rides in transitively
                          via mockito-core. -->
+                    <!--suppress UnresolvedMavenProperty -->
                     <argLine>-javaagent:${net.bytebuddy:byte-buddy-agent:jar}</argLine>
                 </configuration>
             </plugin>

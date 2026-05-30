@@ -94,10 +94,14 @@ public class LocalCliProcessManager {
             return false;
         }
 
-        String adapterPath = adaptersDir + "/" + switch (cliType) {
+        String effectiveCliType = cliType != null ? cliType : "claude_code";
+        if (cliType == null) {
+            log.warn("[CliPM] Agent {} has null cliType, defaulting to claude_code", agentId);
+        }
+        String adapterPath = adaptersDir + "/" + switch (effectiveCliType) {
             case "claude_code" -> "claude-adapter.mjs";
             case "open_code" -> "opencode-adapter.mjs";
-            default -> throw new IllegalArgumentException("Unknown cliType: " + cliType);
+            default -> throw new IllegalArgumentException("Unknown cliType: " + effectiveCliType);
         };
 
         File adapterFile = new File(adapterPath);

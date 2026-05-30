@@ -71,7 +71,6 @@ pom.xml.versionsBackup
 /server/nacos-server/data
 /server/nacos-server/logs
 
-.flattened-pom.xml
 .cursor
 .gstack/
 

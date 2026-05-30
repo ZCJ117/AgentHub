@@ -117,9 +117,9 @@ public class GroupOrchestratorService {
                     .bodyToFlux(String.class)
                     .doOnNext(raw -> {
                         int count = rawChunks.incrementAndGet();
-                        if (count <= 2 || count % 50 == 0) {
-                            log.info("Orchestrator SSE raw chunk #{}: {}", count,
-                                    raw.length() > 200 ? raw.substring(0, 200) + "..." : raw);
+                        if (count <= 2 || count % 100 == 0) {
+                            log.debug("Orchestrator SSE raw chunk #{}: {}", count,
+                                    raw.length() > 150 ? raw.substring(0, 150) + "..." : raw);
                         }
                     })
                     .concatMap(raw -> Flux.fromStream(
