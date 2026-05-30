@@ -210,6 +210,18 @@ mateclaw-server/src/main/resources/
 
 以及所有样板资源（prompts、skill-templates、templates 等）保留在 server 模块的 resources 中。
 
+## 重构约束
+
+**重构以文件移动为主，不修改业务逻辑代码。** 只允许以下修改：
+
+1. **移动文件** — 将 Java 文件和资源文件从 `mateclaw-server` 移动到对应新模块
+2. **修改包名** — 文件移动后包路径变更，对应修改 `package` 声明和 import 语句
+3. **修改 pom.xml** — 父子模块的依赖声明、模块间依赖
+4. **编译修复** — 因包路径变更、模块拆分导致的编译错误（如跨模块 import 路径更新）
+5. **去掉违规依赖** — Controller 直接注入 Mapper 等违反分层约束的代码，改为注入 Service 接口
+
+**禁止修改**：任何业务逻辑、方法实现、算法、流程控制代码。
+
 ## 迁移策略
 
 ### 阶段一：创建模块骨架
