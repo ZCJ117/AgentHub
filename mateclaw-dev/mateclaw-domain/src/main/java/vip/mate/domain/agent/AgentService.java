@@ -30,8 +30,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import vip.mate.infra.agent.AgentGraphBuilder;
-import vip.mate.infra.agent.AgentToolSet;
+import vip.mate.domain.agent.AgentGraphBuilder;
+import vip.mate.domain.agent.AgentToolSet;
 
 /**
  * Agent 业务服务

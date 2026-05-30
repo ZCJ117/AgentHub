@@ -13,7 +13,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.openai.OpenAiChatOptions;
-import vip.mate.infra.agent.GraphEventPublisher;
+import vip.mate.domain.agent.GraphEventPublisher;
 import vip.mate.domain.agent.graph.NodeStreamingChatHelper;
 import vip.mate.domain.agent.graph.state.MateClawStateAccessor;
 import vip.mate.domain.agent.prompt.PromptLoader;

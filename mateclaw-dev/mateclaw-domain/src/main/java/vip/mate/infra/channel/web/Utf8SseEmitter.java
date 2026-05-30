@@ -1,4 +1,4 @@
-package vip.mate.domain.channel.web;
+package vip.mate.infra.channel.web;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

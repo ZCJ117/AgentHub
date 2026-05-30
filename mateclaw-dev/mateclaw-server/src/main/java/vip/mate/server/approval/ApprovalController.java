@@ -16,7 +16,7 @@ import java.util.Map;
  * Approval read-only endpoints.
  * <p>
  * Web approve / deny actions ride the SSE {@code POST /chat/stream} path with
- * {@code /approve} or {@code /deny} text commands ({@link vip.mate.infra.channel.web.ChatController}
+ * {@code /approve} or {@code /deny} text commands ({@link vip.mate.server.channel.web.ChatController}
  * intercepts), so a write-style {@code POST /approve} REST endpoint was deleted
  * in RFC-067 PR 6 — it bypassed the unified workflow lifecycle and let any
  * future caller silently regress to the pre-RFC ghost-approval state.

@@ -2,7 +2,7 @@ package vip.mate.infra.channel.wecom.cards;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import vip.mate.infra.channel.feishu.cards.tool_guard.ToolGuardCardKindFactory;
+import vip.mate.infra.channel.wecom.cards.tool_guard.ToolGuardCardKindFactory;
 
 import java.util.HashMap;
 import java.util.List;

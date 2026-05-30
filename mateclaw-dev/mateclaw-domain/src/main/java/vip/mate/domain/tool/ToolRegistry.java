@@ -12,7 +12,7 @@ import vip.mate.domain.tool.repository.ToolMapper;
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
-import vip.mate.infra.agent.AgentToolSet;
+import vip.mate.domain.agent.AgentToolSet;
 import vip.mate.domain.system.I18nService;
 import vip.mate.domain.system.LocaleAwareToolCallback;
 

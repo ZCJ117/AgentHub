@@ -10,7 +10,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import vip.mate.infra.agent.AgentGraphBuilder;
+import vip.mate.domain.agent.AgentGraphBuilder;
 import vip.mate.domain.agent.prompt.PromptLoader;
 import vip.mate.domain.llm.model.ModelConfigEntity;
 import vip.mate.domain.llm.service.ModelConfigService;

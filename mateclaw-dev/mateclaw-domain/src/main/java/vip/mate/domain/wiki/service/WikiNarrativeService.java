@@ -12,7 +12,7 @@ import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
-import vip.mate.infra.agent.AgentGraphBuilder;
+import vip.mate.domain.agent.AgentGraphBuilder;
 import vip.mate.domain.agent.prompt.PromptLoader;
 import vip.mate.domain.llm.model.ModelConfigEntity;
 import vip.mate.domain.llm.service.ModelConfigService;

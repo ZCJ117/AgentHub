@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 import vip.mate.domain.memory.event.DreamCompletedEvent;
 import vip.mate.domain.memory.event.DreamFailedEvent;
 import vip.mate.domain.memory.event.MemoryWriteEvent;
-import vip.mate.infra.agent.AgentGraphBuilder;
+import vip.mate.domain.agent.AgentGraphBuilder;
 import vip.mate.domain.agent.prompt.PromptLoader;
 import vip.mate.domain.llm.service.ModelConfigService;
 import vip.mate.domain.llm.model.ModelConfigEntity;

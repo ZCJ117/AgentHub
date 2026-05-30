@@ -2,7 +2,7 @@ package vip.mate.domain.agent.graph.state;
 
 import com.alibaba.cloud.ai.graph.OverAllState;
 import org.springframework.ai.chat.messages.Message;
-import vip.mate.infra.agent.GraphEventPublisher;
+import vip.mate.domain.agent.GraphEventPublisher;
 import vip.mate.domain.agent.context.ChatOrigin;
 import vip.mate.domain.agent.graph.NodeStreamingChatHelper;
 

@@ -1,4 +1,4 @@
-package vip.mate.domain.channel.web;
+package vip.mate.infra.channel.web;
 
 import java.util.List;
 import java.util.Locale;
@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  * Marks model-predicted tool results that are replaced by the actual post-tool
  * answer segment.
  */
-final class SegmentSupersedeDetector {
+public final class SegmentSupersedeDetector {
 
     static final String REASON_TOOL_RESULT_REPLACED_MODEL_CLAIM = "tool_result_replaced_model_claim";
 
@@ -23,7 +23,7 @@ final class SegmentSupersedeDetector {
     private SegmentSupersedeDetector() {
     }
 
-    static void markSuperseded(List<Map<String, Object>> segments) {
+    public static void markSuperseded(List<Map<String, Object>> segments) {
         if (segments == null || segments.size() < 3) {
             return;
         }

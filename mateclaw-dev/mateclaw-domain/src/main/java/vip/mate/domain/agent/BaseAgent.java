@@ -34,7 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
-import vip.mate.infra.agent.AgentToolSet;
+import vip.mate.domain.agent.AgentToolSet;
 
 /**
  * Agent 抽象基类
@@ -109,7 +109,7 @@ public abstract class BaseAgent {
      * {@link #buildUserMessage} can ask whether the agent has any media-capable
      * tool when the primary model rejects an attachment.
      */
-    protected vip.mate.infra.agent.AgentToolSet toolSet;
+    protected vip.mate.domain.agent.AgentToolSet toolSet;
 
     /**
      * Optional sidecar routing services. Null when not wired (e.g. tests with
@@ -1129,7 +1129,7 @@ public abstract class BaseAgent {
         Object decision = inputs.get(vip.mate.domain.agent.graph.state.MateClawStateKeys.ROUTING_DECISION);
         if (decision instanceof java.util.Map<?, ?> map && !map.isEmpty()) {
             return reactor.core.publisher.Flux.just(vip.mate.domain.agent.AgentService.StreamDelta.event(
-                    vip.mate.infra.agent.GraphEventPublisher.EVENT_ROUTING_DECISION,
+                    vip.mate.domain.agent.GraphEventPublisher.EVENT_ROUTING_DECISION,
                     (java.util.Map<String, Object>) map));
         }
         return reactor.core.publisher.Flux.empty();

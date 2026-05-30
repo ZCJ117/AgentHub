@@ -1,4 +1,4 @@
-package vip.mate.domain.channel.web;
+package vip.mate.server.channel.web;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

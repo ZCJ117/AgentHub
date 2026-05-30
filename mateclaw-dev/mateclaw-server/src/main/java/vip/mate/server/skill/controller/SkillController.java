@@ -27,7 +27,7 @@ import vip.mate.domain.skill.workspace.BundledSkillSyncer;
 import vip.mate.domain.skill.workspace.SkillFileSyncer;
 import vip.mate.domain.skill.workspace.SkillWorkspaceManager;
 import vip.mate.common.exception.MateClawException;
-import vip.mate.common.exception.ConfirmRequiredException;
+import vip.mate.domain.skill.lifecycle.ConfirmRequiredException;
 import vip.mate.domain.skill.lifecycle.LifecycleTransition;
 import vip.mate.domain.skill.lifecycle.SkillCuratorJob;
 import vip.mate.domain.skill.lifecycle.SkillCuratorReport;

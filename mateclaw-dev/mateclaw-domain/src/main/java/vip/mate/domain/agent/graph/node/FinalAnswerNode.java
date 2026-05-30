@@ -3,7 +3,7 @@ package vip.mate.domain.agent.graph.node;
 import com.alibaba.cloud.ai.graph.OverAllState;
 import com.alibaba.cloud.ai.graph.action.NodeAction;
 import lombok.extern.slf4j.Slf4j;
-import vip.mate.infra.agent.GraphEventPublisher;
+import vip.mate.domain.agent.GraphEventPublisher;
 import vip.mate.domain.agent.graph.state.DirectToolOutput;
 import vip.mate.domain.agent.graph.state.FinishReason;
 import vip.mate.domain.agent.graph.state.MateClawStateAccessor;

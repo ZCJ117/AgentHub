@@ -1,4 +1,4 @@
-package vip.mate.infra.agent;
+package vip.mate.domain.agent;
 
 // PR-0b: DashScope imports moved with the construction code into DashScopeChatModelBuilder.
 import com.alibaba.cloud.ai.graph.CompiledGraph;
@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import vip.mate.infra.agent.bridge.AgentBridgeManager;
 import vip.mate.infra.agent.bridge.BridgedAgent;
 import vip.mate.infra.agent.cli.LocalCliProcessManager;
+
 import vip.mate.domain.agent.repository.AgentMapper;
 import vip.mate.domain.agent.graph.StateGraphReActAgent;
 import vip.mate.domain.agent.graph.NodeStreamingChatHelper;
@@ -34,7 +35,7 @@ import vip.mate.domain.agent.graph.plan.state.PlanStateKeys;
 import vip.mate.domain.agent.graph.state.MateClawStateKeys;
 import vip.mate.domain.agent.binding.service.AgentBindingService;
 import vip.mate.domain.agent.model.AgentEntity;
-import vip.mate.config.GraphObservationProperties;
+import vip.mate.domain.config.GraphObservationProperties;
 import vip.mate.common.exception.MateClawException;
 import vip.mate.infra.llm.chatmodel.OpenAiCompatibleChatModelBuilder;
 import vip.mate.infra.llm.chatmodel.ReasoningEffortResolver;
@@ -80,41 +81,41 @@ public class AgentGraphBuilder {
     private final ToolRegistry toolRegistry;
     private final AgentBindingService agentBindingService;
     private final SkillService skillService;
-    private final vip.mate.skill.runtime.SkillRuntimeService skillRuntimeService;
+    private final vip.mate.domain.skill.runtime.SkillRuntimeService skillRuntimeService;
     private final ConversationService conversationService;
     private final ModelConfigService modelConfigService;
     private final ModelProviderService modelProviderService;
-    private final vip.mate.llm.service.ModelCapabilityService modelCapabilityService;
+    private final vip.mate.domain.llm.service.ModelCapabilityService modelCapabilityService;
     private final ProviderRouter providerRouter;
     private final PlanningService planningService;
     private final ToolGuardService toolGuardService;
-    private final vip.mate.tool.guard.service.ToolGuardConfigService toolGuardConfigService;
+    private final vip.mate.domain.tool.guard.service.ToolGuardConfigService toolGuardConfigService;
     private final ApprovalWorkflowService approvalService;
     private final ChatStreamTracker streamTracker;
     private final SystemSettingService systemSettingService;
     // PR-0b: dashScopeChatModel + dashScopeConnectionProperties live on DashScopeChatModelBuilder now.
     private final RetryTemplate retryTemplate;
     private final GraphObservationProperties graphObservationProperties;
-    private final vip.mate.config.ToolTimeoutProperties toolTimeoutProperties;
+    private final vip.mate.domain.config.ToolTimeoutProperties toolTimeoutProperties;
     private final MemoryManager memoryManager;
     private final WorkspaceFileService workspaceFileService;
-    private final vip.mate.agent.context.ConversationWindowManager conversationWindowManager;
-    private final vip.mate.llm.chatgpt.ChatGPTResponsesClient chatGPTResponsesClient;
+    private final vip.mate.domain.agent.context.ConversationWindowManager conversationWindowManager;
+    private final vip.mate.infra.llm.chatgpt.ChatGPTResponsesClient chatGPTResponsesClient;
     private final WikiContextService wikiContextService;
-    private final vip.mate.workspace.core.service.WorkspaceService workspaceService;
-    private final vip.mate.llm.cache.AnthropicCacheOptionsFactory anthropicCacheOptionsFactory;
-    private final vip.mate.llm.cache.LlmCacheMetricsAggregator llmCacheMetricsAggregator;
-    private final vip.mate.agent.graph.executor.ToolResultStorage toolResultStorage;
-    private final vip.mate.tool.ToolConcurrencyRegistry toolConcurrencyRegistry;
-    private final vip.mate.i18n.I18nService i18nService;
-    private final vip.mate.llm.failover.ProviderHealthTracker providerHealthTracker;
-    private final vip.mate.llm.chatmodel.ProviderChatModelFactory chatModelFactory;
-    private final vip.mate.llm.failover.AvailableProviderPool providerPool;
-    private final vip.mate.tool.document.GeneratedFileCache generatedFileCache;
+    private final vip.mate.domain.workspace.core.service.WorkspaceService workspaceService;
+    private final vip.mate.domain.llm.cache.AnthropicCacheOptionsFactory anthropicCacheOptionsFactory;
+    private final vip.mate.domain.llm.cache.LlmCacheMetricsAggregator llmCacheMetricsAggregator;
+    private final vip.mate.domain.agent.graph.executor.ToolResultStorage toolResultStorage;
+    private final vip.mate.domain.tool.ToolConcurrencyRegistry toolConcurrencyRegistry;
+    private final vip.mate.domain.system.I18nService i18nService;
+    private final vip.mate.domain.llm.failover.ProviderHealthTracker providerHealthTracker;
+    private final vip.mate.infra.llm.chatmodel.ProviderChatModelFactory chatModelFactory;
+    private final vip.mate.domain.llm.failover.AvailableProviderPool providerPool;
+    private final vip.mate.domain.tool.document.GeneratedFileCache generatedFileCache;
     /** DashScope-specific construction lives here; only called for the built-in-search log. */
-    private final vip.mate.llm.chatmodel.DashScopeChatModelBuilder dashScopeBuilder;
-    private final vip.mate.llm.routing.MultimodalRouter multimodalRouter;
-    private final vip.mate.llm.routing.MediaCaptionService mediaCaptionService;
+    private final vip.mate.infra.llm.chatmodel.DashScopeChatModelBuilder dashScopeBuilder;
+    private final vip.mate.domain.llm.routing.MultimodalRouter multimodalRouter;
+    private final vip.mate.domain.llm.routing.MediaCaptionService mediaCaptionService;
     private final AgentBridgeManager agentBridgeManager;
     private final LocalCliProcessManager localCliProcessManager;
     private final AgentMapper agentMapper;
@@ -125,10 +126,10 @@ public class AgentGraphBuilder {
      * When present, the executor receives it so child-agent denied-tool
      * attempts can be recorded.
      */
-    private vip.mate.audit.service.AuditEventService auditEventService;
+    private vip.mate.domain.audit.service.AuditEventService auditEventService;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
-    public void setAuditEventService(vip.mate.audit.service.AuditEventService s) {
+    public void setAuditEventService(vip.mate.domain.audit.service.AuditEventService s) {
         this.auditEventService = s;
     }
 
@@ -419,7 +420,7 @@ public class AgentGraphBuilder {
                                          String reasoningEffort, ModelConfigEntity primaryModelConfig,
                                          Long agentId) {
         try {
-            List<vip.mate.llm.failover.FallbackEntry> fallbackChain = buildFallbackChain(primaryModelConfig, agentId);
+            List<vip.mate.domain.llm.failover.FallbackEntry> fallbackChain = buildFallbackChain(primaryModelConfig, agentId);
             NodeStreamingChatHelper streamingHelper = new NodeStreamingChatHelper(
                     streamTracker, fallbackChain, llmCacheMetricsAggregator, providerHealthTracker,
                     primaryModelConfig != null ? primaryModelConfig.getProvider() : null,
@@ -588,7 +589,7 @@ public class AgentGraphBuilder {
                                    String reasoningEffort, ModelConfigEntity primaryModelConfig,
                                    Long agentId) {
         try {
-            List<vip.mate.llm.failover.FallbackEntry> fallbackChain = buildFallbackChain(primaryModelConfig, agentId);
+            List<vip.mate.domain.llm.failover.FallbackEntry> fallbackChain = buildFallbackChain(primaryModelConfig, agentId);
             NodeStreamingChatHelper streamingHelper = new NodeStreamingChatHelper(
                     streamTracker, fallbackChain, llmCacheMetricsAggregator, providerHealthTracker,
                     primaryModelConfig != null ? primaryModelConfig.getProvider() : null,
@@ -795,7 +796,7 @@ public class AgentGraphBuilder {
         // PR-0 (RFC-009 Phase 4 prelude): protocol switch extracted to
         // ProviderChatModelFactory + per-protocol ChatModelBuilder strategies.
         // Per-protocol builders (DashScope / OpenAI-compatible / Anthropic /
-        // ChatGPT-Responses) live in vip.mate.agent.chatmodel + vip.mate.llm.chatmodel.
+        // ChatGPT-Responses) live in vip.mate.domain.agent.chatmodel + vip.mate.infra.llm.chatmodel.
         // See RFC-009 Phase 4 plan for the rationale (circular-dep break for
         // ProviderInitProbe + AgentGraphBuilder slimming).
         return chatModelFactory.buildFor(runtimeModel, retryOverride);
@@ -822,7 +823,7 @@ public class AgentGraphBuilder {
      *     the primary model; used to identity-filter the chain
      * @return ordered, possibly-empty list of fallback {@link ChatModel}s
      */
-    List<vip.mate.llm.failover.FallbackEntry> buildFallbackChain(ModelConfigEntity primaryModelConfig) {
+    List<vip.mate.domain.llm.failover.FallbackEntry> buildFallbackChain(ModelConfigEntity primaryModelConfig) {
         return buildFallbackChain(primaryModelConfig, null);
     }
 
@@ -847,7 +848,7 @@ public class AgentGraphBuilder {
      * the first enabled chat model on that provider. Forcing users to mark a
      * default per provider was administrative friction with no real benefit.</p>
      */
-    List<vip.mate.llm.failover.FallbackEntry> buildFallbackChain(ModelConfigEntity primaryModelConfig,
+    List<vip.mate.domain.llm.failover.FallbackEntry> buildFallbackChain(ModelConfigEntity primaryModelConfig,
                                                                   Long agentId) {
         List<ModelProviderEntity> providers;
         try {
@@ -907,7 +908,7 @@ public class AgentGraphBuilder {
             log.debug("[ProviderRouter] chain reorder failed: {}", e.getMessage());
         }
 
-        List<vip.mate.llm.failover.FallbackEntry> chain = new ArrayList<>();
+        List<vip.mate.domain.llm.failover.FallbackEntry> chain = new ArrayList<>();
         for (ModelProviderEntity p : providers) {
             // Don't put the primary provider's row into the fallback chain — same-instance
             // skipping is also done in the runtime walker, but excluding here saves building
@@ -937,7 +938,7 @@ public class AgentGraphBuilder {
             }
             try {
                 ChatModel m = buildRuntimeChatModel(fallbackConfig, RetryTemplate.builder().maxAttempts(1).build());
-                chain.add(new vip.mate.llm.failover.FallbackEntry(p.getProviderId(), m));
+                chain.add(new vip.mate.domain.llm.failover.FallbackEntry(p.getProviderId(), m));
                 log.info("[LlmFailover] chain[{}] = {}/{} (priority={})",
                         chain.size(), p.getProviderId(), fallbackConfig.getModelName(),
                         p.getFallbackPriority());

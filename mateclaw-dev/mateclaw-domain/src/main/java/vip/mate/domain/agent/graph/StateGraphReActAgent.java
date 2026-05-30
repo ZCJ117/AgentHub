@@ -13,7 +13,7 @@ import reactor.core.publisher.Mono;
 import vip.mate.domain.agent.AgentService;
 import vip.mate.domain.agent.AgentState;
 import vip.mate.domain.agent.BaseAgent;
-import vip.mate.infra.agent.GraphEventPublisher;
+import vip.mate.domain.agent.GraphEventPublisher;
 import vip.mate.domain.agent.StructuredStreamCapable;
 import vip.mate.domain.agent.context.ConversationWindowManager;
 import vip.mate.domain.agent.graph.state.MateClawStateKeys;
@@ -25,7 +25,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static vip.mate.domain.agent.graph.state.MateClawStateKeys.*;
-import vip.mate.infra.agent.AgentToolSet;
+import vip.mate.domain.agent.AgentToolSet;
 
 /**
  * 基于 StateGraph v2 的 ReAct Agent
@@ -60,7 +60,7 @@ public class StateGraphReActAgent extends BaseAgent implements StructuredStreamC
      * and were previously ignored, making compression decisions fire late.
      * Nullable for the legacy 5-arg constructor used by older tests.
      */
-    private final vip.mate.infra.agent.AgentToolSet toolSet;
+    private final vip.mate.domain.agent.AgentToolSet toolSet;
 
     public StateGraphReActAgent(ChatClient chatClient, ConversationService conversationService,
                                 CompiledGraph compiledGraph,
@@ -74,7 +74,7 @@ public class StateGraphReActAgent extends BaseAgent implements StructuredStreamC
                                 CompiledGraph compiledGraph,
                                 org.springframework.ai.chat.model.ChatModel chatModel,
                                 ConversationWindowManager conversationWindowManager,
-                                vip.mate.infra.agent.AgentToolSet toolSet) {
+                                vip.mate.domain.agent.AgentToolSet toolSet) {
         super(chatClient, conversationService);
         this.compiledGraph = compiledGraph;
         this.chatModel = chatModel;

@@ -19,7 +19,7 @@ import vip.mate.domain.llm.routing.AgentBindingResolver;
 import vip.mate.infra.skill.acp.AcpSkillBridge;
 import vip.mate.infra.skill.mcp.McpSkillBridge;
 import vip.mate.domain.skill.lifecycle.BlockedByBindingRow;
-import vip.mate.common.exception.ConfirmRequiredException;
+import vip.mate.domain.skill.lifecycle.ConfirmRequiredException;
 import vip.mate.domain.skill.model.SkillEntity;
 import vip.mate.domain.skill.repository.SkillMapper;
 import vip.mate.domain.skill.runtime.SkillRuntimeService;

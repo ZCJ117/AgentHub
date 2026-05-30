@@ -46,6 +46,9 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+import vip.mate.infra.channel.web.ChatStreamTracker;
+import vip.mate.infra.channel.web.Utf8SseEmitter;
+import vip.mate.infra.channel.web.SegmentSupersedeDetector;
 
 /**
  * Web 渠道聊天接口
@@ -1870,7 +1873,7 @@ public class ChatController {
         /**
          * Graph-emitted FinishReason for the turn (e.g. {@code "incomplete"},
          * {@code "stopped"}, {@code "evidence_insufficient"}). Sourced from
-         * the {@code finish_reason} {@link vip.mate.infra.agent.GraphEventPublisher}
+         * the {@code finish_reason} {@link vip.mate.domain.agent.GraphEventPublisher}
          * event that {@code FinalAnswerNode} attaches to its PENDING_EVENTS
          * output — same pipeline the SSE accumulator already drains, so the
          * value is delivered alongside the assistant content (not via a
@@ -1882,7 +1885,7 @@ public class ChatController {
         private String finishReason = "";
         /**
          * Recovery affordance payload from {@link
-         * vip.mate.infra.agent.GraphEventPublisher#feedback}. Persisted into
+         * vip.mate.domain.agent.GraphEventPublisher#feedback}. Persisted into
          * {@code metadata.feedbackEvent} so a page reload still surfaces
          * the retry/regenerate/report card on the failed assistant
          * bubble. Null when the turn ended cleanly.
@@ -1933,7 +1936,7 @@ public class ChatController {
                         finishReason = String.valueOf(reason);
                     }
                 }
-                if (vip.mate.infra.agent.GraphEventPublisher.EVENT_FEEDBACK
+                if (vip.mate.domain.agent.GraphEventPublisher.EVENT_FEEDBACK
                         .equals(delta.eventType())) {
                     // Snapshot the affordance payload so it persists into
                     // message metadata. The same event is also rebroadcast
@@ -1942,7 +1945,7 @@ public class ChatController {
                     // waiting for the message-save round trip.
                     feedbackEvent = delta.eventData();
                 }
-                if (vip.mate.infra.agent.GraphEventPublisher.EVENT_ROUTING_DECISION.equals(delta.eventType())) {
+                if (vip.mate.domain.agent.GraphEventPublisher.EVENT_ROUTING_DECISION.equals(delta.eventType())) {
                     // Captured at turn start; persisted under metadata.routing so the
                     // chat UI can render which sidecar (if any) was invoked. Internal
                     // event — return early to skip rebroadcast on IM channels.

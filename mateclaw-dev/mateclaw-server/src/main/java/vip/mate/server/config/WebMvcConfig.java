@@ -8,6 +8,9 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import vip.mate.domain.config.ConversationWindowProperties;
+import vip.mate.domain.config.GraphObservationProperties;
+import vip.mate.domain.config.ToolTimeoutProperties;
 
 /**
  * Web MVC 配置（跨域、拦截器等）

@@ -1,4 +1,4 @@
-package vip.mate.infra.agent;
+package vip.mate.domain.agent;
 
 import org.springframework.ai.support.ToolCallbacks;
 import org.springframework.ai.tool.ToolCallback;

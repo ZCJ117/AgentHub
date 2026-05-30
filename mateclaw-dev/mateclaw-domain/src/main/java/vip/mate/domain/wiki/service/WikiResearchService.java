@@ -12,7 +12,7 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
-import vip.mate.infra.agent.AgentGraphBuilder;
+import vip.mate.domain.agent.AgentGraphBuilder;
 import vip.mate.domain.agent.prompt.PromptLoader;
 import vip.mate.infra.channel.web.ChatStreamTracker;
 import vip.mate.domain.system.I18nService;

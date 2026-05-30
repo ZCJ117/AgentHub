@@ -25,7 +25,7 @@ import java.util.Map;
  * </ol>
  * <p>
  * Resolved at agent build time and cached per agent — see
- * {@link vip.mate.infra.agent.AgentGraphBuilder#buildAgent}.
+ * {@link vip.mate.domain.agent.AgentGraphBuilder#buildAgent}.
  */
 @Slf4j
 @Service
