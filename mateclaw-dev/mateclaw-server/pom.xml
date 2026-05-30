@@ -22,11 +22,6 @@
             <artifactId>mateclaw-domain</artifactId>
         </dependency>
         <dependency>
-            <groupId>vip.mate</groupId>
-            <artifactId>mateclaw-infrastructure</artifactId>
-        </dependency>
-
-        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>

@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Service;
-import vip.mate.domain.system.SystemSettingService;
+import vip.mate.domain.system.service.SystemSettingService;
 
 import java.util.Locale;
 

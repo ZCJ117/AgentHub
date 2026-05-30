@@ -16,7 +16,6 @@
     <modules>
         <module>mateclaw-common</module>
         <module>mateclaw-domain</module>
-        <module>mateclaw-infrastructure</module>
         <module>mateclaw-server</module>
     </modules>
 
@@ -114,12 +113,6 @@
                 <artifactId>mateclaw-domain</artifactId>
                 <version>${revision}</version>
             </dependency>
-            <dependency>
-                <groupId>vip.mate</groupId>
-                <artifactId>mateclaw-infrastructure</artifactId>
-                <version>${revision}</version>
-            </dependency>
-
             <!-- ==================== Spring AI Alibaba ==================== -->
             <dependency>
                 <groupId>com.alibaba.cloud.ai</groupId>

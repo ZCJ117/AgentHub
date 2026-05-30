@@ -340,9 +340,9 @@ export const useChatStore = defineStore('chat', () => {
         const conv = convStore.conversations.find(
           c => String(c.conversationId) === String(conversationId.value)
         )
-        if (conv && conv.id != null) {
-          convStore.setActive(conv.id)
-          router.replace(`/chat/${conv.id}`)
+        if (conv?.conversationId) {
+          convStore.setActive(conv.conversationId)
+          router.replace(`/chat/${conv.conversationId}`)
         }
       }
     })

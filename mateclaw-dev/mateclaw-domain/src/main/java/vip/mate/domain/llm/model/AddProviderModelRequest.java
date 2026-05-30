@@ -1,0 +1,9 @@
+package vip.mate.domain.llm.model;
+
+import lombok.Data;
+
+@Data
+public class AddProviderModelRequest {
+    private String id;
+    private String name;
+}
