@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { spawn, execSync } from 'child_process';
 import { createInterface } from 'readline';
 import pty from 'node-pty';
 import fs from 'fs';
@@ -12,6 +12,19 @@ if (process.stdout._handle && typeof process.stdout._handle.setBlocking === 'fun
     process.stdout._handle.setBlocking(true);
 }
 const STDOUT_FD = process.stdout.fd || 1;
+
+function resolveExe(name) {
+    if (name.includes('/') || name.includes('\\')) return name; // already a path
+    try {
+        const cmd = process.platform === 'win32' ? `where ${name}` : `which ${name}`;
+        const result = execSync(cmd, { encoding: 'utf-8', timeout: 5000 });
+        const lines = result.trim().split('\n');
+        const exe = lines.find(l => l.endsWith('.exe')) || lines[0];
+        return exe.trim();
+    } catch {
+        return name;
+    }
+}
 
 function send(type, payload = {}) {
     const frame = JSON.stringify({ type, seq: 0, ts: Date.now(), payload });
@@ -68,7 +81,7 @@ rl.on('line', (line) => {
             // Use PTY so the CLI thinks it's writing to a terminal → no libc block-buffering
             let child;
             try {
-                child = pty.spawn(opencodeBin, args, {
+                child = pty.spawn(resolveExe(opencodeBin), args, {
                     name: 'xterm-256color',
                     cols: 200,
                     rows: 40,
