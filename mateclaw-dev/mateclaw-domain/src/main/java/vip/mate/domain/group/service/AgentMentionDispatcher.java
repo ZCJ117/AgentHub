@@ -149,7 +149,7 @@ public class AgentMentionDispatcher {
                 chatPayload.put("systemPrompt", agent.getSystemPrompt() != null ? agent.getSystemPrompt() : "");
                 BridgeFrame request = BridgeFrame.of("chat_request", chatPayload);
                 processManager.sendFrame(agentIdStr, request);
-            }, FluxSink.OverflowStrategy.LATEST)
+            }, FluxSink.OverflowStrategy.BUFFER)
             .doOnNext(delta -> {
                 if (delta.content() != null) {
                     fullResponse.append(delta.content());

@@ -8,7 +8,7 @@ const rl = createInterface({ input: process.stdin });
 
 function send(type, payload = {}) {
     const frame = JSON.stringify({ type, seq: 0, ts: Date.now(), payload });
-    process.stdout.write(frame + '\n');
+    fs.writeSync(1, frame + '\n');
 }
 
 // Handshake
