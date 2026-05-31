@@ -125,6 +125,10 @@ export const useChatStore = defineStore('chat', () => {
       nextBeforeId.value = data?.nextBeforeId || null
     } catch (err) {
       console.warn('Failed to load message history:', err)
+      if (err.response?.status === 403 || err.response?.status === 404) {
+        conversationId.value = null
+        router.replace('/chat')
+      }
     }
   }
 
@@ -176,14 +180,20 @@ export const useChatStore = defineStore('chat', () => {
       }
     }, NO_CONTENT_TIMEOUT)
 
-    const maxTimeId = setTimeout(() => {
-      if (isStreaming.value) {
+    let maxTimeId
+    function scheduleMaxTimeCheck() {
+      maxTimeId = setTimeout(() => {
+        if (!isStreaming.value) return
+        if (agentStreams.value.size > 0) {
+          scheduleMaxTimeCheck()
+          return
+        }
         updateMessage(assistantId, { status: 'completed' })
-        cleanupAgentStreams('error')
         isStreaming.value = false
         sse.disconnect()
-      }
-    }, MAX_STREAM_TIME)
+      }, MAX_STREAM_TIME)
+    }
+    scheduleMaxTimeCheck()
 
     // Backend broadcasts content as "content_delta" events
     sse.on('content_delta', (data) => {
