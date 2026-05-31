@@ -55,6 +55,10 @@ onMounted(async () => {
   await authStore.refreshProfile()
   nickname.value = authStore.nickname || ''
   loadTokens()
+  // Ensure workspace store is loaded before reading basePath
+  if (workspaceStore.activeId == null) {
+    await workspaceStore.loadAndSelect()
+  }
   basePath.value = workspaceStore.activeWorkspace?.basePath || ''
 })
 
@@ -130,6 +134,10 @@ async function savePassword() {
 }
 
 async function saveBasePath() {
+  if (workspaceStore.activeId == null) {
+    pathMsg.value = '工作区未加载，请刷新页面重试'
+    return
+  }
   savingPath.value = true
   pathMsg.value = ''
   try {
