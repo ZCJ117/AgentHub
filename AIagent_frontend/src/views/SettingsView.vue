@@ -1,11 +1,12 @@
 <script setup>
-import { ref, onMounted, h } from 'vue'
+import { ref, onMounted, watch, h } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useRouter } from 'vue-router'
 import { NInput, NButton, NSpace, NCard, NModal, NForm, NFormItem, NDatePicker, NAlert, NPopconfirm, NDataTable, NEmpty } from 'naive-ui'
 import { updateProfile, changePassword } from '@/api/auth'
 import { fetchTokens, createToken, revokeToken } from '@/api/tokens'
+import { updateWorkspace } from '@/api/workspaces'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -19,6 +20,10 @@ const savingProfile = ref(false)
 const savingPassword = ref(false)
 const profileMsg = ref('')
 const passwordMsg = ref('')
+const basePath = ref('')
+const savingPath = ref(false)
+const pathMsg = ref('')
+const pathOk = ref(false)
 const tokenMsg = ref('')
 
 // --- PAT Token state ---
@@ -50,6 +55,11 @@ onMounted(async () => {
   await authStore.refreshProfile()
   nickname.value = authStore.nickname || ''
   loadTokens()
+  basePath.value = workspaceStore.activeWorkspace?.basePath || ''
+})
+
+watch(() => workspaceStore.activeWorkspace, (ws) => {
+  basePath.value = ws?.basePath || ''
 })
 
 async function loadTokens() {
@@ -118,6 +128,23 @@ async function savePassword() {
     savingPassword.value = false
   }
 }
+
+async function saveBasePath() {
+  savingPath.value = true
+  pathMsg.value = ''
+  try {
+    const data = { basePath: basePath.value || null }
+    await updateWorkspace(workspaceStore.activeId, data)
+    pathOk.value = true
+    pathMsg.value = basePath.value ? '工作目录已更新' : '工作目录已清除'
+    await workspaceStore.refresh()
+  } catch (err) {
+    pathOk.value = false
+    pathMsg.value = err.message || '保存失败'
+  } finally {
+    savingPath.value = false
+  }
+}
 </script>
 
 <template>
@@ -156,7 +183,18 @@ async function savePassword() {
     </NCard>
 
     <NCard title="工作区" class="settings-card">
-      <p>当前工作区 ID: {{ workspaceStore.activeId || '未选择' }}</p>
+      <NSpace vertical :size="12">
+        <div>
+          <label>当前工作区</label>
+          <NInput :value="workspaceStore.activeWorkspace?.name || '未选择'" disabled />
+        </div>
+        <div>
+          <label>工作目录（Agent CLI 执行路径）</label>
+          <NInput v-model:value="basePath" placeholder="如 D:\projects\my-app 或 /home/user/projects/my-app" />
+        </div>
+        <NButton type="primary" @click="saveBasePath" :loading="savingPath">保存</NButton>
+        <span v-if="pathMsg" :style="{ fontSize: '13px', color: pathOk ? '#34C759' : '#FF3B30' }">{{ pathMsg }}</span>
+      </NSpace>
     </NCard>
 
     <NCard title="关于" class="settings-card">
