@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
+import pty from 'node-pty';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -27,7 +28,12 @@ send('ready');
 let agentId = null;
 let agentName = null;
 let systemPrompt = '';
-let currentSessionId = null;  // persisted across chat_request invocations for --resume
+let currentSessionId = null;
+
+// Strip ANSI escape sequences from PTY output
+function stripAnsi(str) {
+    return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\][0-9;]*[^\x07]*\x07/g, '');
+}
 
 rl.on('line', (line) => {
     let frame;
@@ -65,17 +71,30 @@ rl.on('line', (line) => {
                 env.CLAUDE_MD_PATH = process.env.CLAUDE_MD_PATH;
             }
 
-            const child = spawn('claude', args, {
-                env,
-                stdio: ['ignore', 'pipe', 'pipe']
-            });
+            // Use PTY so the CLI thinks it's writing to a terminal → no libc block-buffering
+            let child;
+            try {
+                child = pty.spawn('claude', args, {
+                    name: 'xterm-256color',
+                    cols: 200,
+                    rows: 40,
+                    cwd: process.cwd(),
+                    env
+                });
+            } catch (err) {
+                process.stderr.write('[claude-adapter] PTY spawn failed: ' + err.message + ' — falling back to pipe\n');
+                child = spawn('claude', args, {
+                    env,
+                    stdio: ['ignore', 'pipe', 'pipe']
+                });
+            }
 
-            // Create temp log files — raw JSON for debugging, clean text for the terminal window
+            // Create temp log files
             const logFile = path.join(os.tmpdir(), `agenthub-claude-${Date.now()}.log`);
             const cleanLogFile = path.join(os.tmpdir(), `agenthub-claude-clean-${Date.now()}.log`);
             const logStream = fs.createWriteStream(logFile);
             const cleanLogStream = fs.createWriteStream(cleanLogFile);
-            cleanLogStream.write('﻿'); // UTF-8 BOM for Windows PowerShell compatibility
+            cleanLogStream.write('﻿'); // UTF-8 BOM
             process.stderr.write(`[claude-adapter] Log file: ${logFile}\n`);
 
             function sendText(delta) {
@@ -88,9 +107,13 @@ rl.on('line', (line) => {
             let buffer = '';
             let receivedCount = 0;
             let forwardedCount = 0;
-            child.stdout.on('data', (chunk) => {
-                logStream.write(chunk);  // Tee to log file for terminal window
-                buffer += chunk.toString();
+
+            // PTY emits 'data' events (merged stdout+stderr); pipe spawn uses child.stdout
+            const outputStream = child.stdout || child;
+            outputStream.on('data', (chunk) => {
+                logStream.write(chunk);  // Tee to log file (raw with ANSI for debugging)
+                const clean = stripAnsi(chunk.toString());
+                buffer += clean;
                 const lines = buffer.split('\n');
                 buffer = lines.pop();
 
@@ -101,7 +124,7 @@ rl.on('line', (line) => {
                     try {
                         event = JSON.parse(l);
                     } catch {
-                        process.stderr.write('[claude-adapter] JSON parse error: ' + l.slice(0, 200) + '\n');
+                        // Not JSON — could be stderr output mixed in from PTY
                         continue;
                     }
 
@@ -110,24 +133,16 @@ rl.on('line', (line) => {
                     try {
                         switch (event.type) {
                             case 'stream_event':
-                                if (event.delta?.text) {
-                                    sendText(event.delta.text);
-                                }
-                                if (event.delta?.partial_json) {
-                                    sendText(event.delta.partial_json);
-                                }
+                                if (event.delta?.text) sendText(event.delta.text);
+                                if (event.delta?.partial_json) sendText(event.delta.partial_json);
                                 break;
                             case 'content_block_start':
-                                // Anthropic API: content_block.text for text blocks
-                                if (event.content_block?.type === 'text' && event.content_block?.text) {
+                                if (event.content_block?.type === 'text' && event.content_block?.text)
                                     sendText(event.content_block.text);
-                                }
                                 break;
                             case 'content_block_stop':
-                                // End of a content block — no payload to forward
                                 break;
                             case 'assistant': {
-                                // Claude Code 2.x format: content blocks inside event.message.content[]
                                 const blocks = event.message?.content;
                                 if (blocks && Array.isArray(blocks)) {
                                     for (const block of blocks) {
@@ -145,10 +160,7 @@ rl.on('line', (line) => {
                                 break;
                             }
                             case 'content_block_delta':
-                                // Claude Code 1.x / Anthropic API format
-                                if (event.delta?.text) {
-                                    sendText(event.delta.text);
-                                }
+                                if (event.delta?.text) sendText(event.delta.text);
                                 break;
                             case 'tool_use':
                                 send('tool_call', {
@@ -164,7 +176,6 @@ rl.on('line', (line) => {
                                 });
                                 break;
                             case 'user': {
-                                // tool_result may be embedded in a user message with content blocks
                                 const userBlocks = event.message?.content;
                                 if (userBlocks && Array.isArray(userBlocks)) {
                                     for (const block of userBlocks) {
@@ -180,22 +191,16 @@ rl.on('line', (line) => {
                             }
                             case 'system':
                             case 'init':
-                                // Capture session_id for --resume on subsequent requests
                                 if (event.session_id && !currentSessionId) {
                                     currentSessionId = event.session_id;
                                 }
                                 break;
                             case 'result':
-                                // Final result event — text already forwarded via assistant events
                                 break;
                             default: {
-                                // Only forward text-like fields from unknown events,
-                                // and gate on reasonable size to avoid flooding the SSE channel
                                 const textLike = event.text || event.content || event.delta?.text;
                                 if (textLike && typeof textLike === 'string' && textLike.length < 5000) {
                                     sendText(textLike);
-                                } else if (!textLike) {
-                                    process.stderr.write('[claude-adapter] Unhandled event type: ' + event.type + '\n');
                                 }
                             }
                         }
@@ -206,10 +211,13 @@ rl.on('line', (line) => {
                 }
             });
 
-            child.stderr.on('data', (chunk) => {
-                logStream.write(chunk);  // Tee stderr to log file too
-                process.stderr.write('[claude] ' + chunk);
-            });
+            // For non-PTY spawn, also handle stderr
+            if (child.stderr && child.stderr !== child.stdout) {
+                child.stderr.on('data', (chunk) => {
+                    logStream.write(chunk);
+                    process.stderr.write('[claude] ' + chunk);
+                });
+            }
 
             let finalEventSent = false;
             function sendFinal(type, payload = {}) {
@@ -218,7 +226,7 @@ rl.on('line', (line) => {
                 send(type, payload);
             }
 
-            child.on('close', (code) => {
+            function onClose(code) {
                 logStream.end();
                 cleanLogStream.end();
                 process.stderr.write(`[claude-adapter] received=${receivedCount} forwarded=${forwardedCount} sessionId=${currentSessionId || 'none'}\n`);
@@ -228,10 +236,17 @@ rl.on('line', (line) => {
                 if (buffer.trim() && !finalEventSent) {
                     sendText(buffer);
                 }
-                sendFinal('done', { exitCode: code });
+                sendFinal('done', { exitCode: code != null ? code : 0 });
                 rl.close();
                 process.exit(0);
-            });
+            }
+
+            // PTY uses 'exit', pipe uses 'close'
+            if (child.onExit) {
+                child.onExit(({ exitCode }) => onClose(exitCode));
+            } else {
+                child.on('close', onClose);
+            }
 
             child.on('error', (err) => {
                 logStream.end();

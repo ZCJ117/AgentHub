@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
+import pty from 'node-pty';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -27,6 +28,11 @@ send('ready');
 let agentId = null;
 let agentName = null;
 let systemPrompt = '';
+
+// Strip ANSI escape sequences from PTY output
+function stripAnsi(str) {
+    return str.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/\x1b\][0-9;]*[^\x07]*\x07/g, '');
+}
 
 rl.on('line', (line) => {
     let frame;
@@ -57,22 +63,36 @@ rl.on('line', (line) => {
                 env.OPENCODE_SYSTEM_PROMPT = systemPrompt;
             }
 
-            // Create temp log files synchronously so they exist before spawn and terminal open
+            const opencodeBin = process.env.OPENCODE_BIN || 'opencode';
+
+            // Use PTY so the CLI thinks it's writing to a terminal → no libc block-buffering
+            let child;
+            try {
+                child = pty.spawn(opencodeBin, args, {
+                    name: 'xterm-256color',
+                    cols: 200,
+                    rows: 40,
+                    cwd: process.cwd(),
+                    env
+                });
+            } catch (err) {
+                process.stderr.write('[opencode-adapter] PTY spawn failed: ' + err.message + ' — falling back to pipe\n');
+                child = spawn(opencodeBin, args, {
+                    env,
+                    stdio: ['ignore', 'pipe', 'pipe']
+                });
+            }
+
+            // Create temp log files
             const ts = Date.now();
             const logFile = path.join(os.tmpdir(), `agenthub-opencode-${ts}.log`);
             const cleanLogFile = path.join(os.tmpdir(), `agenthub-opencode-clean-${ts}.log`);
             fs.writeFileSync(logFile, '');
-            fs.writeFileSync(cleanLogFile, '﻿'); // UTF-8 BOM for Windows PowerShell compatibility
+            fs.writeFileSync(cleanLogFile, '﻿'); // UTF-8 BOM
             process.stderr.write(`[opencode-adapter] Log file: ${logFile}\n`);
 
             const logStream = fs.createWriteStream(logFile, { flags: 'a' });
             const cleanLogStream = fs.createWriteStream(cleanLogFile, { flags: 'a' });
-
-            const opencodeBin = process.env.OPENCODE_BIN || 'opencode';
-            const child = spawn(opencodeBin, args, {
-                env,
-                stdio: ['ignore', 'pipe', 'pipe']
-            });
 
             function sendText(delta) {
                 send('text', { delta });
@@ -83,9 +103,13 @@ rl.on('line', (line) => {
             let buffer = '';
             let receivedCount = 0;
             let forwardedCount = 0;
-            child.stdout.on('data', (chunk) => {
-                logStream.write(chunk);  // Tee to log file for terminal window
-                buffer += chunk.toString();
+
+            // PTY emits 'data' events (merged stdout+stderr); pipe spawn uses child.stdout
+            const outputStream = child.stdout || child;
+            outputStream.on('data', (chunk) => {
+                logStream.write(chunk);
+                const clean = stripAnsi(chunk.toString());
+                buffer += clean;
                 const lines = buffer.split('\n');
                 buffer = lines.pop();
 
@@ -96,7 +120,7 @@ rl.on('line', (line) => {
                     try {
                         event = JSON.parse(l);
                     } catch {
-                        process.stderr.write('[opencode-adapter] JSON parse error: ' + l.slice(0, 200) + '\n');
+                        // Not JSON — could be stderr output mixed in from PTY
                         continue;
                     }
 
@@ -105,31 +129,22 @@ rl.on('line', (line) => {
                     try {
                         switch (event.type) {
                             case 'text':
-                                if (event.part?.text) {
-                                    sendText(event.part.text);
-                                }
+                                if (event.part?.text) sendText(event.part.text);
                                 break;
                             case 'step_start':
                             case 'step_finish':
                                 break;
                             case 'stream_event':
-                                // Partial-JSON rendering events
-                                if (event.delta?.text) {
-                                    sendText(event.delta.text);
-                                }
-                                if (event.delta?.partial_json) {
-                                    sendText(event.delta.partial_json);
-                                }
+                                if (event.delta?.text) sendText(event.delta.text);
+                                if (event.delta?.partial_json) sendText(event.delta.partial_json);
                                 break;
                             case 'content_block_start':
-                                if (event.content_block?.type === 'text' && event.content_block?.text) {
+                                if (event.content_block?.type === 'text' && event.content_block?.text)
                                     sendText(event.content_block.text);
-                                }
                                 break;
                             case 'content_block_stop':
                                 break;
                             case 'assistant': {
-                                // Handle nested content blocks (Claude Code 2.x format)
                                 const blocks = event.message?.content;
                                 if (blocks && Array.isArray(blocks)) {
                                     for (const block of blocks) {
@@ -144,16 +159,11 @@ rl.on('line', (line) => {
                                         }
                                     }
                                 }
-                                // Also handle flat delta.text (Anthropic API format)
-                                if (event.delta?.text) {
-                                    sendText(event.delta.text);
-                                }
+                                if (event.delta?.text) sendText(event.delta.text);
                                 break;
                             }
                             case 'content_block_delta':
-                                if (event.delta?.text) {
-                                    sendText(event.delta.text);
-                                }
+                                if (event.delta?.text) sendText(event.delta.text);
                                 break;
                             case 'tool_use':
                                 send('tool_call', {
@@ -169,7 +179,6 @@ rl.on('line', (line) => {
                                 });
                                 break;
                             case 'user': {
-                                // tool_result may be embedded in user message content blocks
                                 const userBlocks = event.message?.content;
                                 if (userBlocks && Array.isArray(userBlocks)) {
                                     for (const block of userBlocks) {
@@ -185,17 +194,13 @@ rl.on('line', (line) => {
                             }
                             case 'system':
                             case 'init':
-                                // Infrastructure events — silently suppress
                                 break;
                             case 'result':
-                                // Final result event — text already forwarded via assistant events
                                 break;
                             default: {
                                 const textLike = event.text || event.content || event.delta?.text;
                                 if (textLike && typeof textLike === 'string' && textLike.length < 5000) {
                                     sendText(textLike);
-                                } else if (!textLike) {
-                                    process.stderr.write('[opencode-adapter] Unhandled event type: ' + event.type + '\n');
                                 }
                             }
                         }
@@ -206,10 +211,13 @@ rl.on('line', (line) => {
                 }
             });
 
-            child.stderr.on('data', (chunk) => {
-                logStream.write(chunk);  // Tee stderr to log file too
-                process.stderr.write('[opencode] ' + chunk);
-            });
+            // For non-PTY spawn, also handle stderr
+            if (child.stderr && child.stderr !== child.stdout) {
+                child.stderr.on('data', (chunk) => {
+                    logStream.write(chunk);
+                    process.stderr.write('[opencode] ' + chunk);
+                });
+            }
 
             let finalEventSent = false;
             function sendFinal(type, payload = {}) {
@@ -218,17 +226,23 @@ rl.on('line', (line) => {
                 send(type, payload);
             }
 
-            child.on('close', (code) => {
+            function onClose(code) {
                 logStream.end();
                 cleanLogStream.end();
                 process.stderr.write(`[opencode-adapter] received=${receivedCount} forwarded=${forwardedCount}\n`);
                 if (buffer.trim() && !finalEventSent) {
                     sendText(buffer);
                 }
-                sendFinal('done', { exitCode: code });
+                sendFinal('done', { exitCode: code != null ? code : 0 });
                 rl.close();
                 process.exit(0);
-            });
+            }
+
+            if (child.onExit) {
+                child.onExit(({ exitCode }) => onClose(exitCode));
+            } else {
+                child.on('close', onClose);
+            }
 
             child.on('error', (err) => {
                 logStream.end();
