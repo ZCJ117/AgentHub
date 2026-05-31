@@ -700,18 +700,18 @@ public class ChatStreamTracker {
                     it.remove();
                 }
             }
-        }
 
-        // Direct SSE write — bypasses broken SseEmitter for reliable delivery
-        jakarta.servlet.ServletOutputStream directOut = directSseOutMap.get(conversationId);
-        if (directOut != null) {
-            try {
-                String sse = "event: " + eventName + "\ndata: " + jsonData + "\n\n";
-                directOut.write(sse.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                directOut.flush();
-            } catch (Exception e) {
-                log.debug("Direct SSE write failed for {}: {}", conversationId, e.getMessage());
-                directSseOutMap.remove(conversationId);
+            // Direct SSE write — inside lock to prevent interleaving with concurrent broadcasts
+            jakarta.servlet.ServletOutputStream directOut = directSseOutMap.get(conversationId);
+            if (directOut != null) {
+                try {
+                    String sse = "event: " + eventName + "\ndata: " + jsonData + "\n\n";
+                    directOut.write(sse.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    directOut.flush();
+                } catch (Exception e) {
+                    log.debug("Direct SSE write failed for {}: {}", conversationId, e.getMessage());
+                    directSseOutMap.remove(conversationId);
+                }
             }
         }
 
