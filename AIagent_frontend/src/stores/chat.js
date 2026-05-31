@@ -174,7 +174,6 @@ export const useChatStore = defineStore('chat', () => {
       if (!contentReceived && isStreaming.value && agentStreams.value.size === 0) {
         streamError.value = 'Agent 响应超时，请重试'
         updateMessage(assistantId, { status: 'error' })
-        cleanupAgentStreams('error')
         isStreaming.value = false
         sse.disconnect()
       }
@@ -203,7 +202,6 @@ export const useChatStore = defineStore('chat', () => {
         if (isStreaming.value && agentStreams.value.size === 0) {
           streamError.value = 'Agent 响应超时，请重试'
           updateMessage(assistantId, { status: 'error' })
-          cleanupAgentStreams('error')
           isStreaming.value = false
           sse.disconnect()
         }
