@@ -13,6 +13,8 @@ import vip.mate.domain.agent.model.AgentEntity;
 import vip.mate.infra.channel.web.ChatStreamTracker;
 import vip.mate.domain.workspace.conversation.ConversationService;
 import vip.mate.domain.workspace.conversation.repository.MessageMapper;
+import vip.mate.domain.workspace.core.repository.WorkspaceMapper;
+import vip.mate.domain.workspace.core.model.WorkspaceEntity;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +38,7 @@ public class AgentMentionDispatcher {
     private final LocalCliProcessManager processManager;
     private final ChatStreamTracker streamTracker;
     private final MessageMapper messageMapper;
+    private final WorkspaceMapper workspaceMapper;
 
     /** Regex: @AgentName task content */
     private static final Pattern AGENT_PATTERN = Pattern.compile("^@(\\S+)\\s+(.+)$");
@@ -126,9 +129,10 @@ public class AgentMentionDispatcher {
         StringBuilder fullResponse = new StringBuilder();
 
         try {
+            String workingDir = resolveWorkingDir(conversationId);
             boolean spawned = processManager.spawn(
                     agentIdStr, agent.getCliType(), agentName,
-                    agent.getSystemPrompt(), claudeMdPath);
+                    agent.getSystemPrompt(), claudeMdPath, workingDir);
 
             if (!spawned && !processManager.isRunning(agentIdStr)) {
                 log.error("[Dispatcher] Failed to spawn CLI for agent={}", agentName);
@@ -227,6 +231,21 @@ public class AgentMentionDispatcher {
                     "conversationId", conversationId,
                     "status", "completed"
             ));
+        }
+    }
+
+    private String resolveWorkingDir(String conversationId) {
+        if (workspaceMapper == null) return null;
+        try {
+            var conv = conversationService.getByConversationId(conversationId);
+            if (conv == null || conv.getWorkspaceId() == null) return null;
+            WorkspaceEntity ws = workspaceMapper.selectById(conv.getWorkspaceId());
+            if (ws == null) return null;
+            String basePath = ws.getBasePath();
+            return (basePath != null && !basePath.isBlank()) ? basePath : null;
+        } catch (Exception e) {
+            log.warn("[Dispatcher] Failed to resolve working dir: {}", e.getMessage());
+            return null;
         }
     }
 
