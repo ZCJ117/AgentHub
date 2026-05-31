@@ -12,6 +12,9 @@ import vip.mate.infra.agent.cli.LocalCliProcessManager;
 import vip.mate.domain.agent.model.AgentEntity;
 import vip.mate.domain.agent.repository.AgentMapper;
 import vip.mate.domain.workspace.conversation.ConversationService;
+import vip.mate.domain.workspace.core.repository.WorkspaceMapper;
+import vip.mate.domain.workspace.core.model.WorkspaceEntity;
+import vip.mate.domain.workspace.conversation.model.ConversationEntity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +36,7 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
     private final AgentBridgeManager bridgeManager;
     private final LocalCliProcessManager processManager;
     private final AgentMapper agentMapper;
+    private final WorkspaceMapper workspaceMapper;
 
     /** CLI type for local process agents: claude_code / open_code */
     private String cliType;
@@ -45,17 +49,20 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
         this.bridgeManager = bridgeManager;
         this.processManager = null;
         this.agentMapper = agentMapper;
+        this.workspaceMapper = null;
     }
 
     /** Process bridge constructor */
     public BridgedAgent(ConversationService conversationService,
                         AgentBridgeManager bridgeManager,
                         LocalCliProcessManager processManager,
-                        AgentMapper agentMapper) {
+                        AgentMapper agentMapper,
+                        WorkspaceMapper workspaceMapper) {
         super(null, conversationService);
         this.bridgeManager = bridgeManager;
         this.processManager = processManager;
         this.agentMapper = agentMapper;
+        this.workspaceMapper = workspaceMapper;
     }
 
     public void setCliType(String cliType) {
@@ -114,8 +121,9 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
         return Flux.<AgentService.StreamDelta>create(sink -> {
             setState(AgentState.RUNNING);
 
+            String workingDir = resolveWorkingDir(conversationId);
             boolean spawned = processManager.spawn(
-                    agentId, cliType, agentName, systemPrompt, null);
+                    agentId, cliType, agentName, systemPrompt, null, workingDir);
 
             if (!spawned && !processManager.isRunning(agentId)) {
                 sink.error(new IllegalStateException(
@@ -205,6 +213,21 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
         } catch (Exception e) {
             log.warn("[BridgedAgent] Failed to build conversation context: {}", e.getMessage());
             return userMessage;
+        }
+    }
+
+    private String resolveWorkingDir(String conversationId) {
+        if (workspaceMapper == null) return null;
+        try {
+            ConversationEntity conv = conversationService.getByConversationId(conversationId);
+            if (conv == null || conv.getWorkspaceId() == null) return null;
+            WorkspaceEntity ws = workspaceMapper.selectById(conv.getWorkspaceId());
+            if (ws == null) return null;
+            String basePath = ws.getBasePath();
+            return (basePath != null && !basePath.isBlank()) ? basePath : null;
+        } catch (Exception e) {
+            log.warn("[BridgedAgent] Failed to resolve working dir: {}", e.getMessage());
+            return null;
         }
     }
 

@@ -19,6 +19,7 @@ import vip.mate.infra.agent.bridge.BridgedAgent;
 import vip.mate.infra.agent.cli.LocalCliProcessManager;
 
 import vip.mate.domain.agent.repository.AgentMapper;
+import vip.mate.domain.workspace.core.repository.WorkspaceMapper;
 import vip.mate.domain.agent.graph.StateGraphReActAgent;
 import vip.mate.domain.agent.graph.NodeStreamingChatHelper;
 import vip.mate.domain.agent.graph.executor.ToolExecutionExecutor;
@@ -119,6 +120,7 @@ public class AgentGraphBuilder {
     private final AgentBridgeManager agentBridgeManager;
     private final LocalCliProcessManager localCliProcessManager;
     private final AgentMapper agentMapper;
+    private final WorkspaceMapper workspaceMapper;
 
     /**
      * Optional audit pipeline. Setter injection (rather than a constructor
@@ -398,7 +400,7 @@ public class AgentGraphBuilder {
         if (entity.getCliType() != null && !entity.getCliType().isBlank()) {
             // Local process path — agent runs via spawned CLI process on this machine
             agent = new BridgedAgent(conversationService,
-                    agentBridgeManager, localCliProcessManager, agentMapper);
+                    agentBridgeManager, localCliProcessManager, agentMapper, workspaceMapper);
             agent.setCliType(entity.getCliType());
         } else {
             // WebSocket-only path — agent connects from a remote machine via bridge
