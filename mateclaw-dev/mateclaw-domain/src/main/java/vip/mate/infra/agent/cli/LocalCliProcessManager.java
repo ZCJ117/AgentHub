@@ -88,7 +88,8 @@ public class LocalCliProcessManager {
      */
     public boolean spawn(String agentId, String cliType,
                          String agentName, String systemPrompt,
-                         String claudeMdPath) {
+                         String claudeMdPath,
+                         String workingDir) {
         if (isRunning(agentId)) {
             log.warn("[CliPM] Agent {} already running, skip spawn", agentId);
             return false;
@@ -120,6 +121,15 @@ public class LocalCliProcessManager {
             pb.environment().put("OPENCODE_BIN", opencodeBin);
             if (claudeMdPath != null && !claudeMdPath.isBlank()) {
                 pb.environment().put("CLAUDE_MD_PATH", claudeMdPath);
+            }
+            if (workingDir != null && !workingDir.isBlank()) {
+                File dir = new File(workingDir);
+                if (!dir.isDirectory()) {
+                    throw new IllegalStateException(
+                            "Workspace working directory does not exist: " + workingDir);
+                }
+                pb.directory(dir);
+                log.info("[CliPM] Set working directory for agent={}: {}", agentId, workingDir);
             }
             Process p = pb.start();
 
