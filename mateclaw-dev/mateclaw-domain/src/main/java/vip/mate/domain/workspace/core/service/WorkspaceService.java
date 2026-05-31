@@ -20,6 +20,8 @@ import vip.mate.domain.workspace.core.repository.WorkspaceMapper;
 import vip.mate.domain.workspace.core.repository.WorkspaceMemberMapper;
 import vip.mate.domain.workspace.core.security.RoleCapabilities;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -223,6 +225,18 @@ public class WorkspaceService {
         if (!entity.getSlug().equals(existing.getSlug())) {
             if (getBySlug(entity.getSlug()) != null) {
                 throw new MateClawException("err.workspace.slug_exists", "工作区标识已存在: " + entity.getSlug());
+            }
+        }
+        // Validate basePath: if non-blank, directory must exist and be readable/writable
+        if (entity.getBasePath() != null && !entity.getBasePath().isBlank()) {
+            Path path = Path.of(entity.getBasePath()).toAbsolutePath().normalize();
+            if (!Files.isDirectory(path)) {
+                throw new MateClawException("err.workspace.basepath_not_dir",
+                        "工作目录不存在: " + path);
+            }
+            if (!Files.isReadable(path) || !Files.isWritable(path)) {
+                throw new MateClawException("err.workspace.basepath_not_accessible",
+                        "工作目录不可读写: " + path);
             }
         }
         workspaceMapper.updateById(entity);
