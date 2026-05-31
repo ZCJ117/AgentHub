@@ -30,6 +30,16 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
   }
 
+  async function refresh() {
+    try {
+      const data = await fetchWorkspaces()
+      const list = Array.isArray(data) ? data : (data?.records || [])
+      workspaces.value = list
+    } catch {
+      // keep stale data on failure
+    }
+  }
+
   async function selectWorkspace(id) {
     activeId.value = id
     localStorage.setItem('ai_agent_workspace_id', String(id))
@@ -48,5 +58,5 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     ])
   }
 
-  return { workspaces, activeId, activeWorkspace, loadAndSelect, selectWorkspace }
+  return { workspaces, activeId, activeWorkspace, loadAndSelect, refresh, selectWorkspace }
 })
