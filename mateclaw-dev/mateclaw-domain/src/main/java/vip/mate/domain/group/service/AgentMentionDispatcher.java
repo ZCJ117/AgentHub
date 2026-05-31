@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import reactor.core.scheduler.Schedulers;
 import vip.mate.domain.agent.AgentService;
 import vip.mate.infra.agent.bridge.model.BridgeFrame;
 import vip.mate.infra.agent.cli.LocalCliProcessManager;
@@ -150,6 +151,7 @@ public class AgentMentionDispatcher {
                 BridgeFrame request = BridgeFrame.of("chat_request", chatPayload);
                 processManager.sendFrame(agentIdStr, request);
             }, FluxSink.OverflowStrategy.BUFFER)
+            .publishOn(Schedulers.boundedElastic())
             .doOnNext(delta -> {
                 if (delta.content() != null) {
                     fullResponse.append(delta.content());

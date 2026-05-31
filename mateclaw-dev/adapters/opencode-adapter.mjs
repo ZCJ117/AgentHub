@@ -6,9 +6,19 @@ import os from 'os';
 
 const rl = createInterface({ input: process.stdin });
 
+// Force unbuffered stdout: set blocking mode and use raw fd writes
+if (process.stdout._handle && typeof process.stdout._handle.setBlocking === 'function') {
+    process.stdout._handle.setBlocking(true);
+}
+const STDOUT_FD = process.stdout.fd || 1;
+
 function send(type, payload = {}) {
     const frame = JSON.stringify({ type, seq: 0, ts: Date.now(), payload });
-    fs.writeSync(1, frame + '\n');
+    try {
+        fs.writeSync(STDOUT_FD, frame + '\n');
+    } catch (e) {
+        process.stderr.write('[opencode-adapter] send error: ' + e.message + '\n');
+    }
 }
 
 // Handshake
