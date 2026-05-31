@@ -78,7 +78,7 @@ rl.on('line', (line) => {
             const conversationId = frame.payload?.conversationId || 'default';
             const resumeId = frame.payload?.sessionId || currentSessionId;
 
-            const args = ['-p', message, '--output-format', 'stream-json', '--verbose'];
+            const args = ['-p', message, '--output-format', 'stream-json', '--verbose', '--dangerously-skip-permissions'];
             if (resumeId) args.push('--resume', resumeId);
 
             const env = { ...process.env };
