@@ -11,6 +11,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import vip.mate.domain.agent.model.AgentEntity;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -84,18 +85,23 @@ public class GroupOrchestratorService {
      * Call Agent01 Orchestrator via direct LLM API.
      * Returns a Flux of text lines (streamed as SSE from the LLM).
      */
-    public Flux<String> callOrchestrator(String userId, String prompt) {
-        log.info("Calling LLM orchestrator agentId={} userId={}", ORCHESTRATOR_AGENT_ID, userId);
+    public Flux<String> callOrchestrator(String userId, String prompt, List<Map<String, String>> history) {
+        log.info("Calling LLM orchestrator agentId={} userId={} historySize={}",
+                ORCHESTRATOR_AGENT_ID, userId, history != null ? history.size() : 0);
 
         try {
+            List<Map<String, String>> allMessages = new ArrayList<>();
+            allMessages.add(Map.of("role", "system", "content", systemPrompt));
+            if (history != null) {
+                allMessages.addAll(history);
+            }
+            allMessages.add(Map.of("role", "user", "content", prompt));
+
             var body = Map.of(
                     "model", model,
                     "stream", true,
                     "thinking", Map.of("type", "enabled"),
-                    "messages", List.of(
-                            Map.of("role", "system", "content", systemPrompt),
-                            Map.of("role", "user", "content", prompt)
-                    )
+                    "messages", allMessages
             );
 
             AtomicInteger rawChunks = new AtomicInteger(0);

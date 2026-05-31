@@ -674,9 +674,26 @@ public class ChatController {
                     List<AgentEntity> memberAgents = new ArrayList<>(agentNameMap.values());
                     String orchPrompt = groupOrchestratorService.buildOrchestratorPrompt(memberAgents, message);
 
+                    // Load conversation history so the orchestrator has multi-turn context
+                    List<Map<String, String>> history = List.of();
+                    try {
+                        List<MessageEntity> recent = conversationService.listRecentMessages(convId, 20);
+                        if (recent != null && !recent.isEmpty()) {
+                            history = recent.stream()
+                                    .filter(msg -> !"system".equals(msg.getRole()))
+                                    .map(msg -> Map.of(
+                                            "role", msg.getRole(),
+                                            "content", conversationService.renderMessageContent(msg)
+                                    ))
+                                    .toList();
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to load group chat history for {}: {}", convId, e.getMessage());
+                    }
+
                     mentionDispatcher.resetForTurn(convId);
 
-                    agentFlux = groupOrchestratorService.callOrchestrator(username, orchPrompt)
+                    agentFlux = groupOrchestratorService.callOrchestrator(username, orchPrompt, history)
                             .map(text -> {
                                 // Feed text through line buffer for @AgentName detection
                                 for (int i = 0; i < text.length(); i++) {
