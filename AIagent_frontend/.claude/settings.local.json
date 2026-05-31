@@ -3,7 +3,8 @@
     "allow": [
       "WebFetch(domain:www.mobanwang.com)",
       "Bash(npm install *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(echo \"EXIT:$?\")"
     ]
   }
 }
