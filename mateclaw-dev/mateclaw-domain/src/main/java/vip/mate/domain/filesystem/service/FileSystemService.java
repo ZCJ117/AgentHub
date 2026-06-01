@@ -1,6 +1,6 @@
 package vip.mate.domain.filesystem.service;
 
-import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
@@ -9,23 +9,14 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class FileSystemService {
 
-    @Data
-    public static class DirEntry {
-        private final String name;
-        private final String path;
-    }
+    public record DirEntry(String name, String path) {}
 
-    @Data
-    public static class DirResult {
-        private final String path;
-        private final String parent;
-        private final List<DirEntry> dirs;
-    }
+    public record DirResult(String path, String parent, List<DirEntry> dirs) {}
 
     /**
      * List directories under the given path.
@@ -38,23 +29,25 @@ public class FileSystemService {
             return listRoots();
         }
 
-        // Normalize to prevent path traversal
+        // Normalize to resolve .. and . to a canonical absolute path
         Path normalized = Paths.get(path).normalize().toAbsolutePath();
         File dir = normalized.toFile();
 
         if (!dir.exists() || !dir.isDirectory() || !dir.canRead()) {
+            log.warn("Directory not accessible: {}", normalized);
             return new DirResult(normalized.toString(), parentPath(normalized), List.of());
         }
 
         File[] children = dir.listFiles(File::isDirectory);
         if (children == null) {
+            log.warn("listFiles returned null for: {}", normalized);
             return new DirResult(normalized.toString(), parentPath(normalized), List.of());
         }
 
         List<DirEntry> entries = Arrays.stream(children)
                 .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
                 .map(f -> new DirEntry(f.getName(), f.getAbsolutePath()))
-                .collect(Collectors.toList());
+                .toList();
 
         return new DirResult(normalized.toString(), parentPath(normalized), entries);
     }
@@ -77,7 +70,7 @@ public class FileSystemService {
                 entries = Arrays.stream(children)
                         .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
                         .map(f -> new DirEntry(f.getName(), f.getAbsolutePath()))
-                        .collect(Collectors.toList());
+                        .toList();
             }
         }
 
