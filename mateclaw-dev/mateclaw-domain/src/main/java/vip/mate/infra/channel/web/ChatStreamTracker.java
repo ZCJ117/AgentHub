@@ -997,7 +997,7 @@ public class ChatStreamTracker {
     /**
      * 完成结果：包含是否全部完成、排队消息快照
      */
-    public record CompletionResult(boolean allDone, QueuedInput queuedInput) {}
+    public record CompletionResult(boolean allDone, int remaining, QueuedInput queuedInput) {}
 
     /**
      * 标记一个 Flux 完成。仅在所有 Flux 都完成时才真正移除 RunState。
@@ -1044,7 +1044,7 @@ public class ChatStreamTracker {
     public CompletionResult completeAndConsumeIfLast(String conversationId) {
         RunState state = runs.get(conversationId);
         if (state == null) {
-            return new CompletionResult(true, null);
+            return new CompletionResult(true, 0, null);
         }
         QueuedInput consumed = null;
         synchronized (state.lock) {
@@ -1052,7 +1052,7 @@ public class ChatStreamTracker {
             if (state.activeFluxCount > 0) {
                 log.debug("Stream partially completed: {} (remaining flux={}, queuePreserved={})",
                         conversationId, state.activeFluxCount, !state.messageQueue.isEmpty());
-                return new CompletionResult(false, null);
+                return new CompletionResult(false, state.activeFluxCount, null);
             }
             // 最后一个 Flux：在同一个锁内消费排队消息（取队首）
             consumed = state.messageQueue.poll();
@@ -1063,7 +1063,7 @@ public class ChatStreamTracker {
         state.done = true;
         log.debug("Stream fully completed: {} (hasQueuedSnapshot={}, kept in map for {}ms reconnect window)",
                 conversationId, consumed != null, DONE_RETENTION_MS);
-        return new CompletionResult(true, consumed);
+        return new CompletionResult(true, 0, consumed);
     }
 
     /**

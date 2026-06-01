@@ -143,8 +143,8 @@ public class AgentMentionDispatcher {
 
         int total = tasks.size();
 
-        // Pre-increment flux count for all tasks so "done" doesn't fire early
-        for (int i = 0; i < total; i++) {
+        // +1 extra slot for aggregation, so done is not set until aggregation finishes
+        for (int i = 0; i < total + 1; i++) {
             streamTracker.incrementFlux(conversationId);
         }
 
@@ -414,16 +414,25 @@ public class AgentMentionDispatcher {
 
             // Decrement flux counter for the completed/failed node
             ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
-            if (cr.allDone()) {
+            if (cr.remaining() == 1) {
+                // All sub-agents done, only aggregation slot remains — trigger summary
                 DagState state = activeDags.get(conversationId);
                 if (state != null) {
                     aggregateAndReport(conversationId, state.nodeMap);
                 } else {
+                    // No active DAG, consume the last slot and finish
+                    streamTracker.completeAndConsumeIfLast(conversationId);
                     streamTracker.broadcastObject(conversationId, "done", Map.of(
                             "conversationId", conversationId,
                             "status", "completed"
                     ));
                 }
+            } else if (cr.allDone()) {
+                // No aggregation slot left (defensive fallback)
+                streamTracker.broadcastObject(conversationId, "done", Map.of(
+                        "conversationId", conversationId,
+                        "status", "completed"
+                ));
             }
         }
     }
@@ -438,6 +447,7 @@ public class AgentMentionDispatcher {
         DagState state = activeDags.get(conversationId);
         if (state == null) {
             log.info("[Dispatcher] DAG already cleared for {}, skipping aggregation", conversationId);
+            streamTracker.completeAndConsumeIfLast(conversationId);
             streamTracker.broadcastObject(conversationId, "done", Map.of(
                     "conversationId", conversationId, "status", "completed"));
             return;
@@ -546,6 +556,8 @@ public class AgentMentionDispatcher {
                                 }
                             }
 
+                            // Consume the aggregation flux slot before broadcasting done
+                            streamTracker.completeAndConsumeIfLast(conversationId);
                             streamTracker.broadcastObject(conversationId, "done", Map.of(
                                     "conversationId", conversationId,
                                     "status", "completed"
@@ -587,6 +599,7 @@ public class AgentMentionDispatcher {
                                     "isAggregation", true
                             ));
 
+                            streamTracker.completeAndConsumeIfLast(conversationId);
                             streamTracker.broadcastObject(conversationId, "done", Map.of(
                                     "conversationId", conversationId,
                                     "status", "completed"
@@ -596,6 +609,7 @@ public class AgentMentionDispatcher {
             } catch (Exception e) {
                 log.error("[Dispatcher] Aggregation setup failed for {}: {}",
                         conversationId, e.getMessage());
+                streamTracker.completeAndConsumeIfLast(conversationId);
                 streamTracker.broadcastObject(conversationId, "done", Map.of(
                         "conversationId", conversationId, "status", "completed"));
             }
