@@ -323,6 +323,16 @@ export const useChatStore = defineStore('chat', () => {
       clearTimeout(maxTimeId)
     })
 
+    sse.on('delegation_progress', (data) => {
+      // When a paused agent is resumed, update its status to streaming
+      if (data.status === 'running' && data.agentName) {
+        const agentId = agentStreams.value.get(data.agentName)
+        if (agentId) {
+          updateMessage(agentId, { status: 'streaming' })
+        }
+      }
+    })
+
     sse.on('session', (data) => {
       if (data.conversationId) {
         conversationId.value = data.conversationId
