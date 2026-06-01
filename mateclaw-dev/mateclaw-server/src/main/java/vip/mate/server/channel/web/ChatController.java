@@ -669,7 +669,14 @@ public class ChatController {
 
                 Flux<AgentService.StreamDelta> agentFlux;
 
-                if (isGroupChat && agentNameMap != null && convDbId != null) {
+                if (isGroupChat && agentNameMap != null && convDbId != null
+                        && mentionDispatcher.hasActiveDag(convId)
+                        && message.trim().startsWith("@")) {
+                    // ── DAG paused: route @mention directly, skip orchestrator ──
+                    mentionDispatcher.spawnSingleAgent(convDbId, convId, agentNameMap,
+                            message.trim(), groupSemaphore);
+                    agentFlux = Flux.just(new AgentService.StreamDelta(message, null));
+                } else if (isGroupChat && agentNameMap != null && convDbId != null) {
                     // ── Group chat: use arther-agent Agent01 as Orchestrator ──
                     List<AgentEntity> memberAgents = new ArrayList<>(agentNameMap.values());
                     String orchPrompt = groupOrchestratorService.buildOrchestratorPrompt(memberAgents, message);
@@ -2301,6 +2308,17 @@ public class ChatController {
                 return "{}";
             }
         }
+    }
+
+    @PostMapping("/{conversationId}/dag/continue")
+    public R<Void> continueDag(@PathVariable String conversationId,
+                               @RequestBody Map<String, String> body) {
+        String agentName = body.get("agentName");
+        if (agentName == null || agentName.isBlank()) {
+            return R.fail("agentName is required");
+        }
+        mentionDispatcher.continueNode(conversationId, agentName, null);
+        return R.ok();
     }
 
     private static Long parseLongOrNull(String s) {
