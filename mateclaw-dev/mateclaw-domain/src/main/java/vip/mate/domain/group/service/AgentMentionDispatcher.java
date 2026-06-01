@@ -520,7 +520,28 @@ public class AgentMentionDispatcher {
                     log.warn("[Dispatcher] Failed to load history for aggregation: {}", e.getMessage());
                 }
 
-                // 5. Call Agent01 and stream the summary
+                // 5. Look up Agent01 entity (needed for agent_message_start and message persistence)
+                final String[] orchestratorAgentId = {null};
+                try {
+                    var wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AgentEntity>()
+                            .eq(AgentEntity::getName, "Agent01");
+                    AgentEntity agent01 = agentMapper.selectList(wrapper)
+                            .stream().findFirst().orElse(null);
+                    if (agent01 != null) {
+                        orchestratorAgentId[0] = String.valueOf(agent01.getId());
+                    }
+                } catch (Exception e) {
+                    log.warn("[Dispatcher] Failed to look up Agent01: {}", e.getMessage());
+                }
+
+                // Broadcast agent_message_start so the frontend creates a dedicated bubble
+                streamTracker.broadcastObject(conversationId, "agent_message_start", Map.of(
+                        "agentName", "Agent01",
+                        "agentId", orchestratorAgentId[0] != null ? orchestratorAgentId[0] : "0",
+                        "taskDescription", "任务执行结果汇总"
+                ));
+
+                // 6. Call Agent01 and stream the summary
                 StringBuilder summaryText = new StringBuilder();
 
                 groupOrchestratorService.callOrchestrator(username, aggregationPrompt, history)
@@ -528,28 +549,28 @@ public class AgentMentionDispatcher {
                             summaryText.append(text);
                             streamTracker.broadcastObject(conversationId, "content_delta", Map.of(
                                     "delta", text,
-                                    "agentName", "Agent01",
-                                    "isAggregation", true
+                                    "agentName", "Agent01"
                             ));
                         })
                         .doOnComplete(() -> {
+                            // Broadcast agent_message_complete so frontend marks the bubble as done
+                            streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
+                                    "agentName", "Agent01",
+                                    "status", "completed"
+                            ));
+
                             // Save summary as a message
                             if (!summaryText.isEmpty()) {
                                 try {
                                     var msg = conversationService.saveMessage(
                                             conversationId, "assistant", summaryText.toString());
-                                    // Look up Agent01 entity by name to set senderAgentId
-                                    try {
-                                        var wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AgentEntity>()
-                                                .eq(AgentEntity::getName, "Agent01");
-                                        AgentEntity agent01 = agentMapper.selectList(wrapper)
-                                                .stream().findFirst().orElse(null);
-                                        if (agent01 != null) {
-                                            msg.setSenderAgentId(agent01.getId());
+                                    if (orchestratorAgentId[0] != null) {
+                                        try {
+                                            msg.setSenderAgentId(Long.parseLong(orchestratorAgentId[0]));
                                             messageMapper.updateById(msg);
+                                        } catch (Exception e) {
+                                            log.warn("[Dispatcher] Failed to set Agent01 sender: {}", e.getMessage());
                                         }
-                                    } catch (Exception e) {
-                                        log.warn("[Dispatcher] Failed to set Agent01 sender: {}", e.getMessage());
                                     }
                                 } catch (Exception e) {
                                     log.error("[Dispatcher] Failed to save aggregation message: {}", e.getMessage());
@@ -568,6 +589,13 @@ public class AgentMentionDispatcher {
                         .doOnError(err -> {
                             log.error("[Dispatcher] Aggregation call failed for {}: {}",
                                     conversationId, err.getMessage());
+
+                            // Broadcast agent_message_complete with error status
+                            streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
+                                    "agentName", "Agent01",
+                                    "status", "error",
+                                    "error", err.getMessage()
+                            ));
 
                             // Fallback: system-level summary
                             long completed = agentResults.stream()
@@ -595,8 +623,7 @@ public class AgentMentionDispatcher {
                             // Stream the fallback as content_delta so frontend sees it
                             streamTracker.broadcastObject(conversationId, "content_delta", Map.of(
                                     "delta", fallback,
-                                    "agentName", "Agent01",
-                                    "isAggregation", true
+                                    "agentName", "Agent01"
                             ));
 
                             streamTracker.completeAndConsumeIfLast(conversationId);
