@@ -245,22 +245,22 @@ public class AgentMentionDispatcher {
                     }
                 }
             } else {
-                // Upstream failed: mark all dependents as WAITING
-                for (TaskNode dependent : node.dependents) {
-                    if (dependent.status == TaskStatus.PENDING) {
-                        dependent.status = TaskStatus.WAITING;
-                        streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
-                                "agentName", dependent.agentName,
-                                "status", "waiting",
-                                "dependsOn", node.agentName
-                        ));
-                        // Decrement flux counter for the waiting node (will never execute)
-                        ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
-                        if (cr.allDone()) {
-                            streamTracker.broadcastObject(conversationId, "done", Map.of(
-                                    "conversationId", conversationId,
-                                    "status", "completed"
+                // Upstream failed: mark all transitive dependents as WAITING
+                java.util.ArrayDeque<TaskNode> queue = new java.util.ArrayDeque<>();
+                queue.add(node);
+                while (!queue.isEmpty()) {
+                    TaskNode failed = queue.poll();
+                    for (TaskNode dependent : failed.dependents) {
+                        if (dependent.status == TaskStatus.PENDING) {
+                            dependent.status = TaskStatus.WAITING;
+                            streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
+                                    "agentName", dependent.agentName,
+                                    "status", "waiting",
+                                    "dependsOn", failed.agentName
                             ));
+                            // Decrement flux counter for the waiting node
+                            streamTracker.completeAndConsumeIfLast(conversationId);
+                            queue.add(dependent);
                         }
                     }
                 }
