@@ -415,10 +415,15 @@ public class AgentMentionDispatcher {
             // Decrement flux counter for the completed/failed node
             ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
             if (cr.allDone()) {
-                streamTracker.broadcastObject(conversationId, "done", Map.of(
-                        "conversationId", conversationId,
-                        "status", "completed"
-                ));
+                DagState state = activeDags.get(conversationId);
+                if (state != null) {
+                    aggregateAndReport(conversationId, state.nodeMap);
+                } else {
+                    streamTracker.broadcastObject(conversationId, "done", Map.of(
+                            "conversationId", conversationId,
+                            "status", "completed"
+                    ));
+                }
             }
         }
     }
