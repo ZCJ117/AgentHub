@@ -424,6 +424,180 @@ public class AgentMentionDispatcher {
     }
 
     /**
+     * After all sub-agents reach terminal state, call Agent01 to generate
+     * a natural-language summary of the DAG execution results.
+     * Runs asynchronously in a virtual thread so it does not block the
+     * semaphore release or the scheduleLock.
+     */
+    private void aggregateAndReport(String conversationId, Map<String, TaskNode> nodeMap) {
+        DagState state = activeDags.get(conversationId);
+        if (state == null) {
+            log.info("[Dispatcher] DAG already cleared for {}, skipping aggregation", conversationId);
+            streamTracker.broadcastObject(conversationId, "done", Map.of(
+                    "conversationId", conversationId, "status", "completed"));
+            return;
+        }
+
+        String originalTask = state.originalTaskMessage;
+        String username = state.username;
+
+        Thread.startVirtualThread(() -> {
+            try {
+                // 1. Collect sub-agent results from nodeMap
+                List<Map<String, Object>> agentResults = new ArrayList<>();
+                for (TaskNode node : nodeMap.values()) {
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("agentName", node.agentName);
+                    result.put("task", node.dagTask.task);
+                    result.put("status", node.status.name().toLowerCase());
+
+                    if (node.status == TaskStatus.FAILED) {
+                        result.put("error", "执行过程中发生错误");
+                    } else if (node.status == TaskStatus.WAITING) {
+                        result.put("waitingReason",
+                                "依赖的上游 Agent " + node.dagTask.dependsOnAgentName + " 执行失败");
+                    }
+
+                    // 2. Try to retrieve the sub-agent's saved message from DB
+                    if (node.dagTask.agent != null) {
+                        try {
+                            List<MessageEntity> recent = conversationService
+                                    .listRecentMessages(conversationId, 50);
+                            if (recent != null) {
+                                Long agentId = node.dagTask.agent.getId();
+                                for (MessageEntity msg : recent) {
+                                    if (agentId.equals(msg.getSenderAgentId())
+                                            && "assistant".equals(msg.getRole())) {
+                                        String content = conversationService.renderMessageContent(msg);
+                                        if (content != null && !content.isBlank()) {
+                                            result.put("output", content);
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            log.warn("[Dispatcher] Failed to retrieve output for {}: {}",
+                                    node.agentName, e.getMessage());
+                        }
+                    }
+
+                    agentResults.add(result);
+                }
+
+                // 3. Build aggregation prompt
+                String aggregationPrompt = groupOrchestratorService.buildAggregationPrompt(
+                        originalTask, agentResults);
+
+                // 4. Load conversation history for context
+                List<Map<String, String>> history = List.of();
+                try {
+                    List<MessageEntity> recent = conversationService.listRecentMessages(conversationId, 20);
+                    if (recent != null && !recent.isEmpty()) {
+                        history = recent.stream()
+                                .filter(msg -> !"system".equals(msg.getRole()))
+                                .map(msg -> Map.of(
+                                        "role", msg.getRole(),
+                                        "content", conversationService.renderMessageContent(msg)))
+                                .toList();
+                    }
+                } catch (Exception e) {
+                    log.warn("[Dispatcher] Failed to load history for aggregation: {}", e.getMessage());
+                }
+
+                // 5. Call Agent01 and stream the summary
+                StringBuilder summaryText = new StringBuilder();
+
+                groupOrchestratorService.callOrchestrator(username, aggregationPrompt, history)
+                        .doOnNext(text -> {
+                            summaryText.append(text);
+                            streamTracker.broadcastObject(conversationId, "content_delta", Map.of(
+                                    "delta", text,
+                                    "agentName", "Agent01",
+                                    "isAggregation", true
+                            ));
+                        })
+                        .doOnComplete(() -> {
+                            // Save summary as a message
+                            if (!summaryText.isEmpty()) {
+                                try {
+                                    var msg = conversationService.saveMessage(
+                                            conversationId, "assistant", summaryText.toString());
+                                    // Look up Agent01 entity by name to set senderAgentId
+                                    try {
+                                        var wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AgentEntity>()
+                                                .eq(AgentEntity::getName, "Agent01");
+                                        AgentEntity agent01 = agentMapper.selectList(wrapper)
+                                                .stream().findFirst().orElse(null);
+                                        if (agent01 != null) {
+                                            msg.setSenderAgentId(agent01.getId());
+                                            messageMapper.updateById(msg);
+                                        }
+                                    } catch (Exception e) {
+                                        log.warn("[Dispatcher] Failed to set Agent01 sender: {}", e.getMessage());
+                                    }
+                                } catch (Exception e) {
+                                    log.error("[Dispatcher] Failed to save aggregation message: {}", e.getMessage());
+                                }
+                            }
+
+                            streamTracker.broadcastObject(conversationId, "done", Map.of(
+                                    "conversationId", conversationId,
+                                    "status", "completed"
+                            ));
+                            log.info("[Dispatcher] Aggregation completed for conversation={}, summaryLen={}",
+                                    conversationId, summaryText.length());
+                        })
+                        .doOnError(err -> {
+                            log.error("[Dispatcher] Aggregation call failed for {}: {}",
+                                    conversationId, err.getMessage());
+
+                            // Fallback: system-level summary
+                            long completed = agentResults.stream()
+                                    .filter(r -> "completed".equals(r.get("status"))).count();
+                            long failed = agentResults.stream()
+                                    .filter(r -> "failed".equals(r.get("status"))).count();
+                            long waiting = agentResults.stream()
+                                    .filter(r -> "waiting".equals(r.get("status"))).count();
+
+                            String fallback = "## 本轮任务汇总\n\n" +
+                                    "| 状态 | 数量 |\n" +
+                                    "|------|------|\n" +
+                                    "| ✅ 已完成 | " + completed + " |\n" +
+                                    "| ❌ 失败 | " + failed + " |\n" +
+                                    "| ⏸ 等待中 | " + waiting + " |\n";
+
+                            try {
+                                var msg = conversationService.saveMessage(
+                                        conversationId, "system", fallback);
+                                log.info("[Dispatcher] Saved fallback system summary msgId={}", msg.getId());
+                            } catch (Exception e) {
+                                log.error("[Dispatcher] Failed to save fallback summary: {}", e.getMessage());
+                            }
+
+                            // Stream the fallback as content_delta so frontend sees it
+                            streamTracker.broadcastObject(conversationId, "content_delta", Map.of(
+                                    "delta", fallback,
+                                    "agentName", "Agent01",
+                                    "isAggregation", true
+                            ));
+
+                            streamTracker.broadcastObject(conversationId, "done", Map.of(
+                                    "conversationId", conversationId,
+                                    "status", "completed"
+                            ));
+                        })
+                        .subscribe();
+            } catch (Exception e) {
+                log.error("[Dispatcher] Aggregation setup failed for {}: {}",
+                        conversationId, e.getMessage());
+                streamTracker.broadcastObject(conversationId, "done", Map.of(
+                        "conversationId", conversationId, "status", "completed"));
+            }
+        });
+    }
+
+    /**
      * Build a contextual message by prepending recent conversation history
      * so the sub-agent has multi-turn context in group chat.
      */
