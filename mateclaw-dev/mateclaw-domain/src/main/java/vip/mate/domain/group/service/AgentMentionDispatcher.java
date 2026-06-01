@@ -155,11 +155,29 @@ public class AgentMentionDispatcher {
             upstream.dependents.add(node);
         }
 
-        // Cycle detection: if every node has inDegree > 0, there's a cycle
-        boolean hasReady = nodeMap.values().stream().anyMatch(n -> n.inDegree == 0);
-        if (!hasReady) {
-            log.error("[Dispatcher] Circular dependency detected in group chat plan");
-            // Degrade: treat all as independent
+        // Cycle detection using Kahn's algorithm (copy in-degrees)
+        Map<TaskNode, Integer> workingDegrees = new LinkedHashMap<>();
+        for (TaskNode n : nodeMap.values()) workingDegrees.put(n, n.inDegree);
+
+        java.util.ArrayDeque<TaskNode> zeroQueue = new java.util.ArrayDeque<>();
+        for (TaskNode n : nodeMap.values()) {
+            if (workingDegrees.get(n) == 0) zeroQueue.add(n);
+        }
+
+        int processed = 0;
+        while (!zeroQueue.isEmpty()) {
+            TaskNode n = zeroQueue.poll();
+            processed++;
+            for (TaskNode dep : n.dependents) {
+                int deg = workingDegrees.get(dep) - 1;
+                workingDegrees.put(dep, deg);
+                if (deg == 0) zeroQueue.add(dep);
+            }
+        }
+
+        if (processed < nodeMap.size()) {
+            log.error("[Dispatcher] Circular dependency detected ({} of {} nodes reachable), degrading to all-parallel",
+                    processed, nodeMap.size());
             nodeMap.values().forEach(n -> { n.inDegree = 0; n.dependents.clear(); });
         }
 
@@ -222,8 +240,8 @@ public class AgentMentionDispatcher {
                 return;
             }
 
+            activeThreads.put(conversationId + ":" + node.agentName, Thread.currentThread());
             try {
-                activeThreads.put(conversationId + ":" + node.agentName, Thread.currentThread());
                 executeSingleNode(node, conversationId, () ->
                         handleNodeCompletion(node, conversationId, semaphore));
             } finally {
@@ -231,7 +249,6 @@ public class AgentMentionDispatcher {
                 semaphore.release();
             }
         });
-        activeThreads.put(conversationId + ":" + node.agentName, vt);
     }
 
     private void handleNodeCompletion(TaskNode node, String conversationId, Semaphore semaphore) {
