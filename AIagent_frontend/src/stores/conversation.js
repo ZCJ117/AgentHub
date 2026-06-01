@@ -127,6 +127,9 @@ export const useConversationStore = defineStore('conversation', () => {
         }
       } catch (e) {
         console.warn('Failed to fetch conversation detail:', e)
+        if (e.response?.status === 404 && String(activeId.value) === cacheKey) {
+          activeId.value = null
+        }
       } finally {
         pendingDetailFetches.delete(cacheKey)
       }

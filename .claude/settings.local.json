@@ -79,7 +79,14 @@
       "Bash(xargs grep -l \"implements\")",
       "Bash(iconv -f GBK -t UTF-8)",
       "Bash(tasklist)",
-      "Bash(grep -E \"^\\\\\\\\[INFO\\\\\\\\] BUILD|^\\\\\\\\[INFO\\\\\\\\] Reactor Summary\" -A 10)"
+      "Bash(grep -E \"^\\\\\\\\[INFO\\\\\\\\] BUILD|^\\\\\\\\[INFO\\\\\\\\] Reactor Summary\" -A 10)",
+      "Bash(where claude *)",
+      "Bash(echo \"---EXIT:$?\")",
+      "Bash(ls *)",
+      "Bash(mvn spring-boot:run -q)",
+      "Bash(curl -s http://localhost:18088/api/v1/agents)",
+      "Bash(mvn spring-boot:run -Dmaven.test.skip=true -q)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:18088/api/v1/agents)"
     ]
   }
 }
