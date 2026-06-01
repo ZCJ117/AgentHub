@@ -384,14 +384,17 @@ export const useChatStore = defineStore('chat', () => {
       const convStore = useConversationStore()
       await convStore.loadList()
 
-      // Navigate to conversation page only for new chats (no route param yet)
+      // Update browser URL for new chats without triggering Vue Router re-render
       if (conversationId.value && !router.currentRoute.value.params.conversationId) {
         const conv = convStore.conversations.find(
           c => String(c.conversationId) === String(conversationId.value)
         )
         if (conv?.conversationId) {
           convStore.setActive(conv.conversationId)
-          router.replace(`/chat/${conv.conversationId}`)
+          // Use replaceState directly to avoid the full component re-render
+          // that router.replace causes (which reloads messages and flashes the UI)
+          const hashPath = `#/chat/${conv.conversationId}`
+          history.replaceState(history.state, '', window.location.pathname + hashPath)
         }
       }
     })
