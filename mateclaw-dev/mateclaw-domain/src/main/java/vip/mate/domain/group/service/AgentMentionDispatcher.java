@@ -58,7 +58,12 @@ public class AgentMentionDispatcher {
     /** Lock for DAG scheduling to prevent concurrent modification of TaskNode state */
     private final Object scheduleLock = new Object();
 
-    enum TaskStatus { PENDING, RUNNING, COMPLETED, FAILED, WAITING }
+    /** Active DAGs during pause — keyed by conversationId, survives between HTTP requests */
+    private final Map<String, DagState> activeDags = new ConcurrentHashMap<>();
+
+    record DagState(Map<String, TaskNode> nodeMap, Semaphore semaphore) {}
+
+    enum TaskStatus { PENDING, RUNNING, COMPLETED, FAILED, WAITING, READY }
 
     record DagTask(String agentName, AgentEntity agent, String task,
                    String dependsOnAgentName, String claudeMdPath) {}
@@ -198,6 +203,83 @@ public class AgentMentionDispatcher {
 
         // Schedule nodes with no dependencies
         scheduleReady(new ArrayList<>(nodeMap.values()), conversationId, semaphore);
+
+        activeDags.put(conversationId, new DagState(nodeMap, semaphore));
+    }
+
+    /**
+     * Continue a READY node after user confirmation.
+     * Idempotent: only acts on nodes with READY status.
+     */
+    public void continueNode(String conversationId, String agentName, Semaphore semaphore) {
+        DagState state = activeDags.get(conversationId);
+        if (state == null) {
+            log.warn("[Dispatcher] continueNode: no active DAG for conversation={}", conversationId);
+            return;
+        }
+        TaskNode node = state.nodeMap.get(agentName);
+        if (node == null) {
+            log.warn("[Dispatcher] continueNode: agent '{}' not found in DAG", agentName);
+            return;
+        }
+        if (node.status != TaskStatus.READY) {
+            log.info("[Dispatcher] continueNode: agent '{}' status={}, not READY, skipping", agentName, node.status);
+            return;
+        }
+        Semaphore sem = semaphore != null ? semaphore : state.semaphore;
+        scheduleNode(node, conversationId, sem);
+    }
+
+    /** Check if a paused DAG exists for this conversation */
+    public boolean hasActiveDag(String conversationId) {
+        return activeDags.containsKey(conversationId);
+    }
+
+    /**
+     * Directly spawn a single agent without DAG collection.
+     * Used during DAG pause for ad-hoc @mentions to completed agents.
+     *
+     * @return true if the line was an @AgentName dispatch
+     */
+    public boolean spawnSingleAgent(Long conversationDbId, String conversationId,
+                                     Map<String, AgentEntity> agentNameMap, String line,
+                                     Semaphore semaphore) {
+        Matcher m = AGENT_PATTERN.matcher(line.trim());
+        if (!m.matches()) return false;
+
+        String agentName = m.group(1);
+        String task = m.group(3) != null ? m.group(3).trim() : "";
+
+        AgentEntity agent = agentNameMap.get(agentName);
+        if (agent == null) {
+            log.warn("[Dispatcher] spawnSingle: agent '{}' not found", agentName);
+            return false;
+        }
+
+        String claudeMdPath = groupConversationService.getClaudeMdPath(conversationDbId, agentName);
+
+        streamTracker.incrementFlux(conversationId);
+
+        DagTask dagTask = new DagTask(agentName, agent, task, null, claudeMdPath);
+        TaskNode node = new TaskNode(agentName, dagTask);
+
+        streamTracker.broadcastObject(conversationId, "agent_message_start", Map.of(
+                "agentName", agentName,
+                "agentId", String.valueOf(agent.getId()),
+                "taskDescription", task
+        ));
+
+        scheduleNode(node, conversationId, semaphore, () -> {
+            ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
+            if (cr.allDone()) {
+                streamTracker.broadcastObject(conversationId, "done", Map.of(
+                        "conversationId", conversationId,
+                        "status", "completed"
+                ));
+            }
+        });
+
+        return true;
     }
 
     private void scheduleReady(List<TaskNode> allNodes, String conversationId, Semaphore semaphore) {
@@ -210,6 +292,10 @@ public class AgentMentionDispatcher {
     }
 
     private void scheduleNode(TaskNode node, String conversationId, Semaphore semaphore) {
+        scheduleNode(node, conversationId, semaphore, null);
+    }
+
+    private void scheduleNode(TaskNode node, String conversationId, Semaphore semaphore, Runnable customOnComplete) {
         node.status = TaskStatus.RUNNING;
 
         log.info("[Dispatcher] Starting agent={}, inDegree was 0", node.agentName);
@@ -226,24 +312,26 @@ public class AgentMentionDispatcher {
                     log.warn("[Dispatcher] Semaphore timeout for agent={}", node.agentName);
                     node.status = TaskStatus.FAILED;
                     streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
-                            "agentName", node.agentName,
-                            "status", "error",
-                            "error", "等待槽位超时"
+                            "agentName", node.agentName, "status", "error", "error", "等待槽位超时"
                     ));
-                    handleNodeCompletion(node, conversationId, semaphore);
+                    if (customOnComplete != null) customOnComplete.run();
+                    else handleNodeCompletion(node, conversationId, semaphore);
                     return;
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 node.status = TaskStatus.FAILED;
-                handleNodeCompletion(node, conversationId, semaphore);
+                if (customOnComplete != null) customOnComplete.run();
+                else handleNodeCompletion(node, conversationId, semaphore);
                 return;
             }
 
             activeThreads.put(conversationId + ":" + node.agentName, Thread.currentThread());
             try {
-                executeSingleNode(node, conversationId, () ->
-                        handleNodeCompletion(node, conversationId, semaphore));
+                executeSingleNode(node, conversationId, () -> {
+                    if (customOnComplete != null) customOnComplete.run();
+                    else handleNodeCompletion(node, conversationId, semaphore);
+                });
             } finally {
                 activeThreads.remove(conversationId + ":" + node.agentName);
                 semaphore.release();
@@ -254,11 +342,18 @@ public class AgentMentionDispatcher {
     private void handleNodeCompletion(TaskNode node, String conversationId, Semaphore semaphore) {
         synchronized (scheduleLock) {
             if (node.status == TaskStatus.COMPLETED) {
-                // Decrement inDegree of dependents; schedule if ready
+                // Decrement inDegree of dependents; mark READY instead of auto-scheduling
                 for (TaskNode dependent : node.dependents) {
                     dependent.inDegree--;
                     if (dependent.inDegree == 0 && dependent.status == TaskStatus.PENDING) {
-                        scheduleNode(dependent, conversationId, semaphore);
+                        dependent.status = TaskStatus.READY;
+                        streamTracker.broadcastObject(conversationId, "agent_ready", Map.of(
+                                "agentName", dependent.agentName,
+                                "agentId", String.valueOf(dependent.dagTask.agent.getId()),
+                                "dependsOn", node.agentName,
+                                "taskDescription", dependent.dagTask.task
+                        ));
+                        log.info("[Dispatcher] Agent {} marked READY, waiting for user confirmation", dependent.agentName);
                     }
                 }
             } else {
@@ -412,6 +507,7 @@ public class AgentMentionDispatcher {
     public void resetForTurn(String conversationId) {
         dispatchedAgents.remove(conversationId);
         collectedTasks.remove(conversationId);
+        activeDags.remove(conversationId);
         // Interrupt any active dispatch threads for this conversation
         String prefix = conversationId + ":";
         activeThreads.forEach((key, thread) -> {
