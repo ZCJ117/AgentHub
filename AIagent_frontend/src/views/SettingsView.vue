@@ -7,6 +7,7 @@ import { NInput, NButton, NSpace, NCard, NModal, NForm, NFormItem, NDatePicker, 
 import { updateProfile, changePassword } from '@/api/auth'
 import { fetchTokens, createToken, revokeToken } from '@/api/tokens'
 import { updateWorkspace } from '@/api/workspaces'
+import { fetchDirs } from '@/api/filesystem'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -25,6 +26,13 @@ const savingPath = ref(false)
 const pathMsg = ref('')
 const pathOk = ref(false)
 const tokenMsg = ref('')
+
+// --- Directory picker state ---
+const dirPickerVisible = ref(false)
+const dirPickerPath = ref('')
+const dirPickerDirs = ref([])
+const dirPickerBreadcrumb = ref([])
+const dirPickerLoading = ref(false)
 
 // --- PAT Token state ---
 const tokens = ref([])
@@ -153,6 +161,49 @@ async function saveBasePath() {
     savingPath.value = false
   }
 }
+
+async function openDirPicker() {
+  await loadDirs(basePath.value || '')
+  dirPickerVisible.value = true
+}
+
+async function loadDirs(targetPath) {
+  dirPickerLoading.value = true
+  try {
+    const result = await fetchDirs(targetPath || null)
+    dirPickerPath.value = result.path
+    dirPickerDirs.value = result.dirs || []
+
+    const crumbs = [{ label: '根目录', path: '' }]
+    if (result.path) {
+      const parts = result.path.replace(/\\/g, '/').split('/').filter(Boolean)
+      let built = ''
+      for (const part of parts) {
+        built = built ? built + '/' + part : (result.path.match(/^[A-Za-z]:/) ? part + '/' : '/' + part)
+        crumbs.push({ label: part, path: built })
+      }
+    }
+    dirPickerBreadcrumb.value = crumbs
+  } catch (err) {
+    pathMsg.value = '目录加载失败：' + (err.message || '未知错误')
+    dirPickerDirs.value = []
+  } finally {
+    dirPickerLoading.value = false
+  }
+}
+
+function navigateToDir(targetPath) {
+  loadDirs(targetPath)
+}
+
+function selectDir(targetPath) {
+  basePath.value = targetPath
+  dirPickerVisible.value = false
+}
+
+function closeDirPicker() {
+  dirPickerVisible.value = false
+}
 </script>
 
 <template>
@@ -198,7 +249,13 @@ async function saveBasePath() {
         </div>
         <div>
           <label>工作目录（Agent CLI 执行路径）</label>
-          <NInput v-model:value="basePath" placeholder="如 D:\projects\my-app 或 /home/user/projects/my-app" />
+          <div style="display: flex; gap: 8px;">
+            <NInput v-model:value="basePath" placeholder="如 D:\projects\my-app" style="flex: 1;" />
+            <NButton @click="openDirPicker" :disabled="workspaceStore.activeId == null">浏览</NButton>
+          </div>
+          <div v-if="workspaceStore.activeWorkspace?.basePath" style="margin-top: 6px; font-size: 12px; color: #18a058;">
+            当前工作目录：{{ workspaceStore.activeWorkspace.basePath }}
+          </div>
         </div>
         <NButton type="primary" @click="saveBasePath" :loading="savingPath">保存</NButton>
         <span v-if="pathMsg" :style="{ fontSize: '13px', color: pathOk ? '#34C759' : '#FF3B30' }">{{ pathMsg }}</span>
@@ -264,6 +321,48 @@ async function saveBasePath() {
         <span v-if="tokenMsg" style="color: #FF3B30; font-size: 13px; margin-right: 12px;">{{ tokenMsg }}</span>
         <NButton v-if="!createdToken" @click="handleCreateToken">创建</NButton>
         <NButton v-else @click="showCreateToken = false">关闭</NButton>
+      </template>
+    </NModal>
+
+    <NModal v-model:show="dirPickerVisible" title="选择工作目录" style="width: 520px;">
+      <div style="padding: 12px 0;">
+        <div style="display: flex; align-items: center; gap: 2px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px;">
+          <span style="color: #666; margin-right: 4px;">路径：</span>
+          <template v-for="(crumb, idx) in dirPickerBreadcrumb" :key="idx">
+            <span v-if="idx > 0" style="color: #999;">&rsaquo;</span>
+            <NButton
+              text
+              size="tiny"
+              @click="navigateToDir(crumb.path)"
+              :style="{ color: idx === dirPickerBreadcrumb.length - 1 ? '#333' : '#1890ff', fontWeight: idx === dirPickerBreadcrumb.length - 1 ? '500' : 'normal' }"
+            >
+              {{ crumb.label }}
+            </NButton>
+          </template>
+        </div>
+
+        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #e8e8e8; border-radius: 6px;">
+          <div v-if="dirPickerLoading" style="padding: 40px; text-align: center; color: #999;">加载中...</div>
+          <div v-else-if="dirPickerDirs.length === 0" style="padding: 40px; text-align: center; color: #999;">此目录为空或无法访问</div>
+          <div
+            v-else
+            v-for="entry in dirPickerDirs"
+            :key="entry.path"
+            style="padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px;"
+            :style="{ background: entry.path === basePath ? '#e6f7ff' : 'transparent' }"
+            @click="navigateToDir(entry.path)"
+          >
+            <span style="font-size: 16px;">&#x1F4C1;</span>
+            <span style="flex: 1;">{{ entry.name }}</span>
+            <NButton size="tiny" @click.stop="selectDir(entry.path)">选择</NButton>
+          </div>
+        </div>
+      </div>
+
+      <template #footer>
+        <NSpace justify="end">
+          <NButton @click="closeDirPicker">取消</NButton>
+        </NSpace>
       </template>
     </NModal>
   </div>
