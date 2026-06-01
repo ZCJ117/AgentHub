@@ -46,10 +46,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function cleanupAgentStreams(status) {
-    agentStreams.value.forEach((agentId) => {
+    const toRemove = []
+    agentStreams.value.forEach((agentId, agentName) => {
+      const msg = messages.value.find(m => m.id === agentId)
+      if (msg && (msg.status === 'waiting' || msg.status === 'ready')) {
+        return // keep READY/WAITING agents intact
+      }
       updateMessage(agentId, { status })
+      toRemove.push(agentName)
     })
-    agentStreams.value.clear()
+    toRemove.forEach(name => agentStreams.value.delete(name))
   }
 
   let sse = null
@@ -274,8 +280,9 @@ export const useChatStore = defineStore('chat', () => {
     })
 
     sse.on('agent_message_start', (data) => {
+      const hasDependency = !!data.dependsOn
       const agentId = addMessageLocal('assistant', '', {
-        status: 'streaming',
+        status: hasDependency ? 'waiting' : 'streaming',
         senderAgentName: data.agentName,
         senderAgentId: data.agentId,
         dependsOn: data.dependsOn || null

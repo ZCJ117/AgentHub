@@ -78,6 +78,7 @@ public class AgentMentionDispatcher {
         volatile int inDegree;
         volatile TaskStatus status = TaskStatus.PENDING;
         final List<TaskNode> dependents = new ArrayList<>();
+        volatile Long placeholderMessageId;
 
         TaskNode(String agentName, DagTask dagTask) {
             this.agentName = agentName;
@@ -232,6 +233,11 @@ public class AgentMentionDispatcher {
                 return;
             }
             Semaphore sem = semaphore != null ? semaphore : state.semaphore;
+            // Remove the placeholder message saved when node was marked READY
+            if (node.placeholderMessageId != null) {
+                try { messageMapper.deleteById(node.placeholderMessageId); } catch (Exception ignored) {}
+                node.placeholderMessageId = null;
+            }
             // Re-acquire flux that was released when node was marked READY
             streamTracker.incrementFlux(conversationId);
             scheduleNode(node, conversationId, sem);
@@ -362,6 +368,16 @@ public class AgentMentionDispatcher {
                                 "taskDescription", dependent.dagTask.task
                         ));
                         log.info("[Dispatcher] Agent {} marked READY, waiting for user confirmation", dependent.agentName);
+                        // Save a placeholder message so READY state persists across page refreshes
+                        try {
+                            var placeholder = conversationService.saveMessage(conversationId, "assistant", "");
+                            placeholder.setSenderAgentId(dependent.dagTask.agent.getId());
+                            placeholder.setStatus("ready");
+                            messageMapper.updateById(placeholder);
+                            dependent.placeholderMessageId = placeholder.getId();
+                        } catch (Exception e) {
+                            log.warn("[Dispatcher] Failed to save READY placeholder for {}: {}", dependent.agentName, e.getMessage());
+                        }
                         // Release this node's pre-allocated flux so "done" can fire
                         streamTracker.completeAndConsumeIfLast(conversationId);
                     }
