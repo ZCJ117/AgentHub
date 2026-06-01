@@ -359,7 +359,7 @@ public class AgentMentionDispatcher {
                         log.error("[Dispatcher] Failed to save message for agent={}: {}", agentName, e.getMessage());
                     }
                 }
-                processManager.terminate(agentIdStr);
+                try { processManager.terminate(agentIdStr); } catch (Exception ignored) {}
                 node.status = TaskStatus.COMPLETED;
                 streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
                         "agentName", agentName,
@@ -370,7 +370,7 @@ public class AgentMentionDispatcher {
             })
             .doOnError(err -> {
                 log.error("[Dispatcher] Agent {} error: {}", agentName, err.getMessage());
-                processManager.terminate(agentIdStr);
+                try { processManager.terminate(agentIdStr); } catch (Exception ignored) {}
                 node.status = TaskStatus.FAILED;
                 streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
                         "agentName", agentName,
