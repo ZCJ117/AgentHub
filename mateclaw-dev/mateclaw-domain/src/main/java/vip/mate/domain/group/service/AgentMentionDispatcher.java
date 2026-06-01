@@ -7,16 +7,19 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.scheduler.Schedulers;
 import vip.mate.domain.agent.AgentService;
+import vip.mate.domain.agent.repository.AgentMapper;
 import vip.mate.infra.agent.bridge.model.BridgeFrame;
 import vip.mate.infra.agent.cli.LocalCliProcessManager;
 import vip.mate.domain.agent.model.AgentEntity;
 import vip.mate.infra.channel.web.ChatStreamTracker;
 import vip.mate.domain.workspace.conversation.ConversationService;
 import vip.mate.domain.workspace.conversation.repository.MessageMapper;
+import vip.mate.domain.workspace.conversation.model.MessageEntity;
 import vip.mate.domain.workspace.core.repository.WorkspaceMapper;
 import vip.mate.domain.workspace.core.model.WorkspaceEntity;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -42,6 +45,7 @@ public class AgentMentionDispatcher {
     private final ChatStreamTracker streamTracker;
     private final MessageMapper messageMapper;
     private final WorkspaceMapper workspaceMapper;
+    private final AgentMapper agentMapper;
 
     /** Regex: @AgentName [after:DependencyAgent] task content */
     private static final Pattern AGENT_PATTERN = Pattern.compile("^@(\\S+)\\s+(?:\\[after:(\\S+)\\]\\s+)?(.+)$");
@@ -395,6 +399,53 @@ public class AgentMentionDispatcher {
         }
     }
 
+    /**
+     * Build a contextual message by prepending recent conversation history
+     * so the sub-agent has multi-turn context in group chat.
+     */
+    private String buildContextMessage(String task, String conversationId) {
+        try {
+            List<MessageEntity> history = conversationService.listRecentMessages(conversationId, 20);
+            if (history == null || history.isEmpty()) {
+                return task;
+            }
+
+            StringBuilder ctx = new StringBuilder();
+            ctx.append("# 以下是群聊对话历史上下文\n\n");
+            Map<Long, String> nameCache = new HashMap<>();
+            for (MessageEntity msg : history) {
+                String roleLabel;
+                if ("user".equals(msg.getRole())) {
+                    roleLabel = "用户";
+                } else if (msg.getSenderAgentId() != null) {
+                    roleLabel = nameCache.computeIfAbsent(msg.getSenderAgentId(), id -> {
+                        if (agentMapper != null) {
+                            AgentEntity ag = agentMapper.selectById(id);
+                            return ag != null ? ag.getName() : "Agent#" + id;
+                        }
+                        return "Agent#" + id;
+                    });
+                } else {
+                    roleLabel = "AI助手";
+                }
+                String content = conversationService.renderMessageContent(msg);
+                if (content != null && !content.isBlank()) {
+                    ctx.append(roleLabel).append(": ").append(content).append("\n\n");
+                }
+            }
+            ctx.append("---\n");
+            ctx.append("# 当前任务\n");
+            ctx.append(task);
+
+            log.debug("[Dispatcher] Built context for conversation={}, historyMsgs={}, totalChars={}",
+                    conversationId, history.size(), ctx.length());
+            return ctx.toString();
+        } catch (Exception e) {
+            log.warn("[Dispatcher] Failed to build conversation context: {}", e.getMessage());
+            return task;
+        }
+    }
+
     private void executeSingleNode(TaskNode node, String conversationId, Runnable onComplete) {
         AgentEntity agent = node.dagTask.agent;
         String agentName = node.agentName;
@@ -428,8 +479,9 @@ public class AgentMentionDispatcher {
                     processManager.terminate(agentIdStr);
                 });
 
+                String contextualMessage = buildContextMessage(task, conversationId);
                 java.util.LinkedHashMap<String, Object> chatPayload = new java.util.LinkedHashMap<>();
-                chatPayload.put("message", task);
+                chatPayload.put("message", contextualMessage);
                 chatPayload.put("conversationId", conversationId);
                 chatPayload.put("systemPrompt", agent.getSystemPrompt() != null ? agent.getSystemPrompt() : "");
                 BridgeFrame request = BridgeFrame.of("chat_request", chatPayload);
