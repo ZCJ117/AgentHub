@@ -33,6 +33,8 @@ const dirPickerPath = ref('')
 const dirPickerDirs = ref([])
 const dirPickerBreadcrumb = ref([])
 const dirPickerLoading = ref(false)
+const dirPickerError = ref('')
+let loadSeq = 0
 
 // --- PAT Token state ---
 const tokens = ref([])
@@ -168,9 +170,12 @@ async function openDirPicker() {
 }
 
 async function loadDirs(targetPath) {
+  const seq = ++loadSeq
   dirPickerLoading.value = true
+  dirPickerError.value = ''
   try {
     const result = await fetchDirs(targetPath || null)
+    if (seq !== loadSeq) return
     dirPickerPath.value = result.path
     dirPickerDirs.value = result.dirs || []
 
@@ -179,16 +184,19 @@ async function loadDirs(targetPath) {
       const parts = result.path.replace(/\\/g, '/').split('/').filter(Boolean)
       let built = ''
       for (const part of parts) {
-        built = built ? built + '/' + part : (result.path.match(/^[A-Za-z]:/) ? part + '/' : '/' + part)
+        built = built ? built.replace(/\/$/, '') + '/' + part : (result.path.match(/^[A-Za-z]:/) ? part + '/' : '/' + part)
         crumbs.push({ label: part, path: built })
       }
     }
     dirPickerBreadcrumb.value = crumbs
   } catch (err) {
-    pathMsg.value = '目录加载失败：' + (err.message || '未知错误')
+    if (seq !== loadSeq) return
+    dirPickerError.value = '目录加载失败：' + (err.message || '未知错误')
     dirPickerDirs.value = []
   } finally {
-    dirPickerLoading.value = false
+    if (seq === loadSeq) {
+      dirPickerLoading.value = false
+    }
   }
 }
 
@@ -203,6 +211,9 @@ function selectDir(targetPath) {
 
 function closeDirPicker() {
   dirPickerVisible.value = false
+  dirPickerDirs.value = []
+  dirPickerBreadcrumb.value = []
+  dirPickerError.value = ''
 }
 </script>
 
@@ -341,9 +352,11 @@ function closeDirPicker() {
           </template>
         </div>
 
+        <div v-if="dirPickerError" style="margin-bottom: 8px; font-size: 13px; color: #FF3B30;">{{ dirPickerError }}</div>
+
         <div style="max-height: 300px; overflow-y: auto; border: 1px solid #e8e8e8; border-radius: 6px;">
           <div v-if="dirPickerLoading" style="padding: 40px; text-align: center; color: #999;">加载中...</div>
-          <div v-else-if="dirPickerDirs.length === 0" style="padding: 40px; text-align: center; color: #999;">此目录为空或无法访问</div>
+          <div v-else-if="dirPickerDirs.length === 0 && !dirPickerError" style="padding: 40px; text-align: center; color: #999;">此目录为空或无法访问</div>
           <div
             v-else
             v-for="entry in dirPickerDirs"
