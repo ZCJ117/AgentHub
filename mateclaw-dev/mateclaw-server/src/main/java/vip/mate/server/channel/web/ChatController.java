@@ -723,7 +723,7 @@ public class ChatController {
                                     mentionDispatcher.collectLine(convDbId, convId,
                                             agentNameMap, lineBuffer.toString());
                                 }
-                                mentionDispatcher.executeCollected(convId, groupSemaphore);
+                                mentionDispatcher.executeCollected(convId, groupSemaphore, message, username);
                             })
                             .doOnError(err -> {
                                 log.error("arther-agent orchestrator stream failed for group {}: {}",

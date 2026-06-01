@@ -46,6 +46,7 @@ public class AgentMentionDispatcher {
     private final MessageMapper messageMapper;
     private final WorkspaceMapper workspaceMapper;
     private final AgentMapper agentMapper;
+    private final GroupOrchestratorService groupOrchestratorService;
 
     /** Regex: @AgentName [after:DependencyAgent] task content */
     private static final Pattern AGENT_PATTERN = Pattern.compile("^@(\\S+)\\s+(?:\\[after:(\\S+)\\]\\s+)?(.+)$");
@@ -65,7 +66,8 @@ public class AgentMentionDispatcher {
     /** Active DAGs during pause — keyed by conversationId, survives between HTTP requests */
     private final Map<String, DagState> activeDags = new ConcurrentHashMap<>();
 
-    record DagState(Map<String, TaskNode> nodeMap, Semaphore semaphore) {}
+    record DagState(Map<String, TaskNode> nodeMap, Semaphore semaphore,
+                    String originalTaskMessage, String username) {}
 
     enum TaskStatus { PENDING, RUNNING, COMPLETED, FAILED, WAITING, READY }
 
@@ -134,7 +136,8 @@ public class AgentMentionDispatcher {
      * Build the DAG from collected tasks and start scheduling.
      * Called once after the orchestrator stream completes.
      */
-    public void executeCollected(String conversationId, Semaphore semaphore) {
+    public void executeCollected(String conversationId, Semaphore semaphore,
+                                 String originalTaskMessage, String username) {
         List<DagTask> tasks = collectedTasks.remove(conversationId);
         if (tasks == null || tasks.isEmpty()) return;
 
@@ -209,7 +212,7 @@ public class AgentMentionDispatcher {
         // Schedule nodes with no dependencies
         scheduleReady(new ArrayList<>(nodeMap.values()), conversationId, semaphore);
 
-        activeDags.put(conversationId, new DagState(nodeMap, semaphore));
+        activeDags.put(conversationId, new DagState(nodeMap, semaphore, originalTaskMessage, username));
     }
 
     /**
