@@ -277,7 +277,8 @@ export const useChatStore = defineStore('chat', () => {
       const agentId = addMessageLocal('assistant', '', {
         status: 'streaming',
         senderAgentName: data.agentName,
-        senderAgentId: data.agentId
+        senderAgentId: data.agentId,
+        dependsOn: data.dependsOn || null
       })
       agentStreams.value.set(data.agentName, agentId)
     })
@@ -285,10 +286,25 @@ export const useChatStore = defineStore('chat', () => {
     sse.on('agent_message_complete', (data) => {
       const agentId = agentStreams.value.get(data.agentName)
       if (agentId) {
+        const status = data.status === 'error' ? 'error'
+          : data.status === 'waiting' ? 'waiting'
+          : 'completed'
         updateMessage(agentId, {
-          status: data.status === 'error' ? 'error' : 'completed'
+          status,
+          dependsOn: data.dependsOn || undefined
         })
         agentStreams.value.delete(data.agentName)
+      }
+    })
+
+    sse.on('agent_ready', (data) => {
+      const agentId = agentStreams.value.get(data.agentName)
+      if (agentId) {
+        updateMessage(agentId, {
+          status: 'ready',
+          dependsOn: data.dependsOn || '',
+          taskDescription: data.taskDescription || ''
+        })
       }
     })
 

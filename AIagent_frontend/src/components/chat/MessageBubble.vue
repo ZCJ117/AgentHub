@@ -28,7 +28,7 @@ const previewCardArtifact = computed(() => {
 
 const emit = defineEmits([
   'regenerate', 'reaction',
-  'cancelTask', 'retryTask',
+  'cancelTask', 'retryTask', 'continueDag',
   'applyDiff', 'rejectDiff',
   'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact',
   'pinMessage', 'unpinMessage',
@@ -38,6 +38,8 @@ const emit = defineEmits([
 const isUser = computed(() => props.message.role === 'user')
 const isStreaming = computed(() => props.message.status === 'streaming')
 const isError = computed(() => props.message.status === 'error')
+const isWaiting = computed(() => props.message.status === 'waiting')
+const isReady = computed(() => props.message.status === 'ready')
 
 const renderedContent = computed(() => {
   if (props.message.messageType === 'text' || props.message.messageType === 'system') {
@@ -160,6 +162,16 @@ watch(isStreaming, (newVal, oldVal) => {
 
       <div v-if="isStreaming" class="msg-status streaming">生成中...</div>
       <div v-else-if="isError" class="msg-status error">生成失败</div>
+      <div v-else-if="isWaiting" class="msg-status waiting">
+        等待上游 {{ message.dependsOn || 'Agent' }} 完成...
+      </div>
+      <div v-else-if="isReady" class="msg-status ready">
+        就绪，等待确认
+        <NButton size="tiny" type="primary" style="margin-left:8px"
+          @click="emit('continueDag', message)">
+          继续执行
+        </NButton>
+      </div>
 
       <!-- Reaction tags bar -->
       <div v-if="visibleReactions.length > 0" class="msg-reactions">
@@ -290,6 +302,14 @@ watch(isStreaming, (newVal, oldVal) => {
 
 .msg-status.error {
   color: #FF3B30;
+}
+
+.msg-status.waiting {
+  color: #E6A817;
+}
+
+.msg-status.ready {
+  color: #1E8E3E;
 }
 
 .msg-actions {

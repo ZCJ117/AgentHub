@@ -6,7 +6,7 @@ import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { useOrchestratorStore } from '@/stores/orchestrator'
 import { useArtifactStore } from '@/stores/artifact'
-import { interruptChat } from '@/api/chat'
+import { interruptChat, continueDag } from '@/api/chat'
 import { pinMessage, unpinMessage } from '@/api/conversations'
 import { fetchReplyChain } from '@/api/messages'
 import { renderMarkdown } from '@/composables/useMarkdown'
@@ -124,6 +124,17 @@ async function handleCancelTask(taskId) {
   await orchStore.cancelTask(taskId)
 }
 
+async function handleContinueDag(message) {
+  const convId = chatStore.conversationId
+  const agentName = message.senderAgentName
+  if (!convId || !agentName) return
+  try {
+    await continueDag(convId, agentName)
+  } catch (e) {
+    console.error('Failed to continue DAG:', e)
+  }
+}
+
 async function handleRetryTask(taskId, assignmentIds) {
   if (!taskId) return
   await orchStore.retryAssignments(taskId, assignmentIds || [])
@@ -192,6 +203,7 @@ function formatTimestamp(ts) {
         @deploy-artifact="handleDeployArtifact"
         @download-artifact="handleDownloadArtifact"
         @cancel-task="handleCancelTask"
+        @continue-dag="handleContinueDag"
         @retry-task="handleRetryTask"
         @pin-message="handlePinMessage"
         @unpin-message="handleUnpinMessage"

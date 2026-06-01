@@ -26,3 +26,7 @@ export function stopChat(conversationId) {
 export function interruptChat(conversationId, message) {
   return apiClient.post(`/api/v1/chat/${conversationId}/interrupt`, { message })
 }
+
+export function continueDag(conversationId, agentName) {
+  return apiClient.post(`/api/v1/chat/${conversationId}/dag/continue`, { agentName })
+}
