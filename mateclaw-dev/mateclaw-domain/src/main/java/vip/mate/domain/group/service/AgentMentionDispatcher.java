@@ -119,8 +119,11 @@ public class AgentMentionDispatcher {
         return true;
     }
 
-    private void spawnAndStreamAgent(AgentEntity agent, String agentName, String task,
-                                      String claudeMdPath, String conversationId) {
+    private void executeSingleNode(TaskNode node, String conversationId, Runnable onComplete) {
+        AgentEntity agent = node.dagTask.agent;
+        String agentName = node.agentName;
+        String task = node.dagTask.task;
+        String claudeMdPath = node.dagTask.claudeMdPath;
         String agentIdStr = String.valueOf(agent.getId());
         StringBuilder fullResponse = new StringBuilder();
 
@@ -132,8 +135,13 @@ public class AgentMentionDispatcher {
 
             if (!spawned && !processManager.isRunning(agentIdStr)) {
                 log.error("[Dispatcher] Failed to spawn CLI for agent={}", agentName);
-                broadcastAgentError(conversationId, agentName, "Agent CLI 启动失败");
-                completeAndBroadcastDoneIfLast(conversationId);
+                node.status = TaskStatus.FAILED;
+                streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
+                        "agentName", agentName,
+                        "status", "failed",
+                        "error", "Agent CLI 启动失败"
+                ));
+                onComplete.run();
                 return;
             }
 
@@ -170,63 +178,43 @@ public class AgentMentionDispatcher {
                         try {
                             messageMapper.updateById(msg);
                         } catch (Exception e) {
-                            log.error("[Dispatcher] Failed to set senderAgentId on message {}: {}", msg.getId(), e.getMessage());
+                            log.error("[Dispatcher] Failed to set senderAgentId on msg {}: {}", msg.getId(), e.getMessage());
                         }
                     } catch (Exception e) {
                         log.error("[Dispatcher] Failed to save message for agent={}: {}", agentName, e.getMessage());
                     }
                 }
+                processManager.terminate(agentIdStr);
+                node.status = TaskStatus.COMPLETED;
                 streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
                         "agentName", agentName,
                         "status", "completed"
                 ));
-                processManager.terminate(agentIdStr);
                 log.info("[Dispatcher] Agent {} completed, response length={}", agentName, responseText.length());
-                ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
-                if (cr.allDone()) {
-                    streamTracker.broadcastObject(conversationId, "done", Map.of(
-                            "conversationId", conversationId,
-                            "status", "completed"
-                    ));
-                }
+                onComplete.run();
             })
             .doOnError(err -> {
                 log.error("[Dispatcher] Agent {} error: {}", agentName, err.getMessage());
-                broadcastAgentError(conversationId, agentName, err.getMessage());
                 processManager.terminate(agentIdStr);
-                ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
-                if (cr.allDone()) {
-                    streamTracker.broadcastObject(conversationId, "done", Map.of(
-                            "conversationId", conversationId,
-                            "status", "error",
-                            "error", err.getMessage()
-                    ));
-                }
+                node.status = TaskStatus.FAILED;
+                streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
+                        "agentName", agentName,
+                        "status", "failed",
+                        "error", err.getMessage()
+                ));
+                onComplete.run();
             })
             .subscribe();
 
         } catch (Exception e) {
             log.error("[Dispatcher] Failed to spawn agent {}: {}", agentName, e.getMessage());
-            broadcastAgentError(conversationId, agentName, e.getMessage());
-            completeAndBroadcastDoneIfLast(conversationId);
-        }
-    }
-
-    private void broadcastAgentError(String conversationId, String agentName, String error) {
-        streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
-                "agentName", agentName,
-                "status", "error",
-                "error", error
-        ));
-    }
-
-    private void completeAndBroadcastDoneIfLast(String conversationId) {
-        ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
-        if (cr.allDone()) {
-            streamTracker.broadcastObject(conversationId, "done", Map.of(
-                    "conversationId", conversationId,
-                    "status", "completed"
+            node.status = TaskStatus.FAILED;
+            streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
+                    "agentName", agentName,
+                    "status", "failed",
+                    "error", e.getMessage()
             ));
+            onComplete.run();
         }
     }
 
