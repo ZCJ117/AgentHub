@@ -138,7 +138,7 @@ public class AgentMentionDispatcher {
                 node.status = TaskStatus.FAILED;
                 streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
                         "agentName", agentName,
-                        "status", "failed",
+                        "status", "error",
                         "error", "Agent CLI 启动失败"
                 ));
                 onComplete.run();
@@ -199,7 +199,7 @@ public class AgentMentionDispatcher {
                 node.status = TaskStatus.FAILED;
                 streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
                         "agentName", agentName,
-                        "status", "failed",
+                        "status", "error",
                         "error", err.getMessage()
                 ));
                 onComplete.run();
@@ -211,7 +211,7 @@ public class AgentMentionDispatcher {
             node.status = TaskStatus.FAILED;
             streamTracker.broadcastObject(conversationId, "agent_message_complete", Map.of(
                     "agentName", agentName,
-                    "status", "failed",
+                    "status", "error",
                     "error", e.getMessage()
             ));
             onComplete.run();
