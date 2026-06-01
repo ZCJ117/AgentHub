@@ -76,30 +76,29 @@ public class AgentMentionDispatcher {
     }
 
     /**
-     * Test a complete line against the @AgentName pattern.
-     * If matched, spawn the agent and stream its response.
+     * Collect a line from the orchestrator output. If it matches @AgentName pattern,
+     * parse and store the DagTask for later DAG-based execution.
      *
      * @param conversationDbId  database ID of the conversation (Long)
      * @param conversationId     string conversation ID
      * @param agentNameMap       name to AgentEntity lookup
      * @param line               a complete line from the orchestrator's output
-     * @param semaphore          concurrency limiter
      * @return true if the line was an @AgentName dispatch
      */
-    public boolean dispatchIfComplete(Long conversationDbId, String conversationId,
-                                       Map<String, AgentEntity> agentNameMap,
-                                       String line, Semaphore semaphore) {
+    public boolean collectLine(Long conversationDbId, String conversationId,
+                               Map<String, AgentEntity> agentNameMap, String line) {
         Matcher m = AGENT_PATTERN.matcher(line.trim());
         if (!m.matches()) return false;
 
         String agentName = m.group(1);
-        String task = m.group(2).trim();
+        String afterAgent = m.group(2);  // null if no [after:XXX]
+        String task = m.group(3).trim();
 
-        // Dedup: don't spawn the same agent twice in one turn
+        // Dedup: don't collect the same agent twice in one turn
         Map<String, Boolean> convDispatched = dispatchedAgents.computeIfAbsent(
                 conversationId, k -> new ConcurrentHashMap<>());
         if (convDispatched.putIfAbsent(agentName, Boolean.TRUE) != null) {
-            log.info("[Dispatcher] Agent {} already dispatched in this turn, skipping", agentName);
+            log.info("[Dispatcher] Agent {} already collected in this turn, skipping", agentName);
             return true;
         }
 
@@ -111,41 +110,12 @@ public class AgentMentionDispatcher {
 
         String claudeMdPath = groupConversationService.getClaudeMdPath(conversationDbId, agentName);
 
-        // Broadcast agent_message_start
-        streamTracker.broadcastObject(conversationId, "agent_message_start", Map.of(
-                "agentName", agentName,
-                "agentId", String.valueOf(agent.getId()),
-                "taskDescription", task
-        ));
+        collectedTasks.computeIfAbsent(conversationId, k -> new ArrayList<>())
+                .add(new DagTask(agentName, agent, task, afterAgent, claudeMdPath));
 
-        // Increment flux count BEFORE starting virtual thread
-        // so orchestrator's completeAndConsumeIfLast sees this sub-agent
-        streamTracker.incrementFlux(conversationId);
-
-        // Run agent in a virtual thread so orchestrator stream is not blocked
-        Thread vt = Thread.startVirtualThread(() -> {
-            try {
-                if (!semaphore.tryAcquire(180, TimeUnit.SECONDS)) {
-                    log.warn("[Dispatcher] Semaphore timeout for agent={}", agentName);
-                    broadcastAgentError(conversationId, agentName, "等待槽位超时");
-                    completeAndBroadcastDoneIfLast(conversationId);
-                    return;
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                completeAndBroadcastDoneIfLast(conversationId);
-                return;
-            }
-
-            try {
-                spawnAndStreamAgent(agent, agentName, task, claudeMdPath, conversationId);
-            } finally {
-                activeThreads.remove(conversationId + ":" + agentName);
-                semaphore.release();
-            }
-        });
-        activeThreads.put(conversationId + ":" + agentName, vt);
-
+        log.info("[Dispatcher] Collected task: agent={}, dependsOn={}, task={}",
+                agentName, afterAgent != null ? afterAgent : "none",
+                task.length() > 80 ? task.substring(0, 80) + "..." : task);
         return true;
     }
 
