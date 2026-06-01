@@ -4,7 +4,6 @@ import lombok.Data;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -69,6 +68,7 @@ public class FileSystemService {
             for (File root : File.listRoots()) {
                 entries.add(new DirEntry(root.getPath(), root.getPath()));
             }
+            entries.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
         } else {
             // Unix: list / children
             File rootDir = new File("/");
