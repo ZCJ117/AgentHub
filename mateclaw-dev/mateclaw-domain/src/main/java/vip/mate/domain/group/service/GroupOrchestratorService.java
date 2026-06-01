@@ -200,4 +200,63 @@ public class GroupOrchestratorService {
         sb.append("\n任务请求：").append(taskMessage);
         return sb.toString();
     }
+
+    /**
+     * Build the prompt for Agent01 to aggregate sub-agent execution results
+     * and generate a summary report for the user.
+     */
+    public String buildAggregationPrompt(
+            String originalTask,
+            List<Map<String, Object>> agentResults) {
+
+        var sb = new StringBuilder();
+        sb.append("你是一个任务协调者。以下是本轮任务分配的执行结果汇总，请撰写一份简明的总结报告。\n\n");
+        sb.append("## 原始任务\n").append(originalTask).append("\n\n");
+        sb.append("## 子任务执行结果\n\n");
+
+        for (var result : agentResults) {
+            String agentName = (String) result.get("agentName");
+            String status = (String) result.get("status");
+            String task = (String) result.get("task");
+            String output = (String) result.getOrDefault("output", "");
+            String error = (String) result.getOrDefault("error", "");
+            String waitingReason = (String) result.getOrDefault("waitingReason", "");
+
+            switch (status) {
+                case "completed" -> {
+                    sb.append("### ✅ ").append(agentName).append(" — 已完成\n");
+                    sb.append("**任务：** ").append(task).append("\n");
+                    sb.append("**输出：**\n");
+                    if (output.length() > 4000) {
+                        sb.append(output, 0, 2000)
+                          .append("\n\n...（省略 ").append(output.length() - 4000)
+                          .append(" 字符）...\n\n")
+                          .append(output, output.length() - 2000, output.length());
+                    } else {
+                        sb.append(output);
+                    }
+                    sb.append("\n\n");
+                }
+                case "failed" -> {
+                    sb.append("### ❌ ").append(agentName).append(" — 执行失败\n");
+                    sb.append("**任务：** ").append(task).append("\n");
+                    sb.append("**错误：** ").append(error != null ? error : "未知错误").append("\n\n");
+                }
+                case "waiting" -> {
+                    sb.append("### ⏸ ").append(agentName).append(" — 等待中（上游失败）\n");
+                    sb.append("**任务：** ").append(task).append("\n");
+                    sb.append("**原因：** ").append(waitingReason != null ? waitingReason : "依赖的上游任务未完成").append("\n\n");
+                }
+            }
+        }
+
+        sb.append("---\n\n");
+        sb.append("请总结：\n");
+        sb.append("1. 本轮整体完成情况（成功数/失败数/等待数）\n");
+        sb.append("2. 已完成任务的关键成果\n");
+        sb.append("3. 失败任务的原因和建议下一步（如：可重新指派、可跳过等）\n");
+        sb.append("4. 等待中的任务说明（因依赖未满足）");
+
+        return sb.toString();
+    }
 }
