@@ -51,7 +51,7 @@ const emit = defineEmits([
   'send', 'stop', 'regenerate', 'reaction', 'interrupt',
   'applyDiff', 'rejectDiff',
   'previewArtifact', 'editArtifact', 'deployArtifact', 'downloadArtifact',
-  'cancelTask', 'retryTask',
+  'cancelTask', 'retryTask', 'continueDag',
   'pinMessage', 'unpinMessage',
   'reply', 'showReplyChain'
 ])
@@ -117,6 +117,7 @@ watch(
         @download-artifact="id => emit('downloadArtifact', id)"
         @cancel-task="taskId => emit('cancelTask', taskId)"
         @retry-task="(taskId, ids) => emit('retryTask', taskId, ids)"
+        @continue-dag="msg => emit('continueDag', msg)"
         @pin-message="id => emit('pinMessage', id)"
         @unpin-message="id => emit('unpinMessage', id)"
         @reply="msg => emit('reply', msg)"
