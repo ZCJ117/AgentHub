@@ -315,6 +315,14 @@ export const useChatStore = defineStore('chat', () => {
       }
     })
 
+    sse.on('dag_paused', () => {
+      // Unlock the composer so user can type while DAG is paused
+      // SSE stays open to receive continued agent output
+      isStreaming.value = false
+      clearTimeout(contentTimeoutId)
+      clearTimeout(maxTimeId)
+    })
+
     sse.on('session', (data) => {
       if (data.conversationId) {
         conversationId.value = data.conversationId

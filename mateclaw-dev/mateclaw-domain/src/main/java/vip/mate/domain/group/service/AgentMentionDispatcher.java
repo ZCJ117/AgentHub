@@ -238,8 +238,6 @@ public class AgentMentionDispatcher {
                 try { messageMapper.deleteById(node.placeholderMessageId); } catch (Exception ignored) {}
                 node.placeholderMessageId = null;
             }
-            // Re-acquire flux that was released when node was marked READY
-            streamTracker.incrementFlux(conversationId);
             scheduleNode(node, conversationId, sem);
         }
     }
@@ -357,6 +355,7 @@ public class AgentMentionDispatcher {
         synchronized (scheduleLock) {
             if (node.status == TaskStatus.COMPLETED) {
                 // Decrement inDegree of dependents; mark READY instead of auto-scheduling
+                boolean pausedAny = false;
                 for (TaskNode dependent : node.dependents) {
                     if (dependent.inDegree > 0) dependent.inDegree--;
                     if (dependent.inDegree == 0 && dependent.status == TaskStatus.PENDING) {
@@ -378,9 +377,15 @@ public class AgentMentionDispatcher {
                         } catch (Exception e) {
                             log.warn("[Dispatcher] Failed to save READY placeholder for {}: {}", dependent.agentName, e.getMessage());
                         }
-                        // Release this node's pre-allocated flux so "done" can fire
-                        streamTracker.completeAndConsumeIfLast(conversationId);
+                        pausedAny = true;
                     }
+                }
+                // Notify frontend to unlock composer while DAG is paused
+                if (pausedAny) {
+                    streamTracker.broadcastObject(conversationId, "dag_paused", Map.of(
+                            "conversationId", conversationId,
+                            "message", "子任务已就绪，等待确认"
+                    ));
                 }
             } else {
                 // Upstream failed: mark all transitive dependents as WAITING
