@@ -215,7 +215,7 @@ export const useChatStore = defineStore('chat', () => {
 
       // Route to correct agent bubble in group chat, or orchestrator otherwise
       const targetId = data.agentName
-        ? agentStreams.value.get(data.agentName)
+        ? (agentStreams.value.get(data.agentName) || assistantId)
         : assistantId
       if (targetId) {
         const msg = messages.value.find(m => m.id === targetId)
