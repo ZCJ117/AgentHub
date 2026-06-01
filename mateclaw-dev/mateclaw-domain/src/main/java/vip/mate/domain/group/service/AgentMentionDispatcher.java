@@ -228,6 +228,8 @@ public class AgentMentionDispatcher {
                 return;
             }
             Semaphore sem = semaphore != null ? semaphore : state.semaphore;
+            // Re-acquire flux that was released when node was marked READY
+            streamTracker.incrementFlux(conversationId);
             scheduleNode(node, conversationId, sem);
         }
     }
@@ -356,6 +358,8 @@ public class AgentMentionDispatcher {
                                 "taskDescription", dependent.dagTask.task
                         ));
                         log.info("[Dispatcher] Agent {} marked READY, waiting for user confirmation", dependent.agentName);
+                        // Release this node's pre-allocated flux so "done" can fire
+                        streamTracker.completeAndConsumeIfLast(conversationId);
                     }
                 }
             } else {
