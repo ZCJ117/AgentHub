@@ -222,12 +222,14 @@ public class AgentMentionDispatcher {
             log.warn("[Dispatcher] continueNode: agent '{}' not found in DAG", agentName);
             return;
         }
-        if (node.status != TaskStatus.READY) {
-            log.info("[Dispatcher] continueNode: agent '{}' status={}, not READY, skipping", agentName, node.status);
-            return;
+        synchronized (scheduleLock) {
+            if (node.status != TaskStatus.READY) {
+                log.info("[Dispatcher] continueNode: agent '{}' status={}, not READY, skipping", agentName, node.status);
+                return;
+            }
+            Semaphore sem = semaphore != null ? semaphore : state.semaphore;
+            scheduleNode(node, conversationId, sem);
         }
-        Semaphore sem = semaphore != null ? semaphore : state.semaphore;
-        scheduleNode(node, conversationId, sem);
     }
 
     /** Check if a paused DAG exists for this conversation */
@@ -344,7 +346,7 @@ public class AgentMentionDispatcher {
             if (node.status == TaskStatus.COMPLETED) {
                 // Decrement inDegree of dependents; mark READY instead of auto-scheduling
                 for (TaskNode dependent : node.dependents) {
-                    dependent.inDegree--;
+                    if (dependent.inDegree > 0) dependent.inDegree--;
                     if (dependent.inDegree == 0 && dependent.status == TaskStatus.PENDING) {
                         dependent.status = TaskStatus.READY;
                         streamTracker.broadcastObject(conversationId, "agent_ready", Map.of(
