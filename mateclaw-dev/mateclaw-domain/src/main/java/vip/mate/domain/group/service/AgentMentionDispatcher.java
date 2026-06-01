@@ -16,6 +16,8 @@ import vip.mate.domain.workspace.conversation.repository.MessageMapper;
 import vip.mate.domain.workspace.core.repository.WorkspaceMapper;
 import vip.mate.domain.workspace.core.model.WorkspaceEntity;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -40,14 +42,38 @@ public class AgentMentionDispatcher {
     private final MessageMapper messageMapper;
     private final WorkspaceMapper workspaceMapper;
 
-    /** Regex: @AgentName task content */
-    private static final Pattern AGENT_PATTERN = Pattern.compile("^@(\\S+)\\s+(.+)$");
+    /** Regex: @AgentName [after:DependencyAgent] task content */
+    private static final Pattern AGENT_PATTERN = Pattern.compile("^@(\\S+)\\s+(?:\\[after:(\\S+)\\]\\s+)?(.+)$");
 
     /** Track active agent streams per conversation to avoid duplicate spawns */
     private final Map<String, Map<String, Boolean>> dispatchedAgents = new ConcurrentHashMap<>();
 
     /** Track active virtual threads so they can be interrupted on abort */
     private final Map<String, Thread> activeThreads = new ConcurrentHashMap<>();
+
+    /** Collected DAG tasks for the current turn */
+    private final Map<String, List<DagTask>> collectedTasks = new ConcurrentHashMap<>();
+
+    /** Lock for DAG scheduling to prevent concurrent modification of TaskNode state */
+    private final Object scheduleLock = new Object();
+
+    enum TaskStatus { PENDING, RUNNING, COMPLETED, FAILED, WAITING }
+
+    record DagTask(String agentName, AgentEntity agent, String task,
+                   String dependsOnAgentName, String claudeMdPath) {}
+
+    static class TaskNode {
+        final String agentName;
+        final DagTask dagTask;
+        volatile int inDegree;
+        volatile TaskStatus status = TaskStatus.PENDING;
+        final List<TaskNode> dependents = new ArrayList<>();
+
+        TaskNode(String agentName, DagTask dagTask) {
+            this.agentName = agentName;
+            this.dagTask = dagTask;
+        }
+    }
 
     /**
      * Test a complete line against the @AgentName pattern.
