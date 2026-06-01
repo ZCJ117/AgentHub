@@ -8,7 +8,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 import vip.mate.MateClawApplication;
-import vip.mate.orchestrator.service.OrchestratorService;
+import vip.mate.domain.group.service.GroupOrchestratorService;
+import vip.mate.domain.orchestrator.service.OrchestratorService;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -75,6 +76,30 @@ class OrchestratorServiceTest {
         orchestratorService.cancelTask(task.getId());
         var updated = orchestratorService.getTaskDetail(task.getId());
         assertThat(updated.getStatus()).isEqualTo("cancelled");
+    }
+
+    @Test
+    @DisplayName("should build aggregation prompt with correct structure for completed, failed, and waiting agents")
+    void buildAggregationPromptProducesCorrectStructure() {
+        var service = new GroupOrchestratorService();
+
+        List<Map<String, Object>> results = List.of(
+            Map.of("agentName", "DesignBot", "status", "completed",
+                   "task", "设计首页", "output", "这是设计稿内容"),
+            Map.of("agentName", "CodeBot", "status", "failed",
+                   "task", "实现代码", "error", "CLI 启动超时"),
+            Map.of("agentName", "TestBot", "status", "waiting",
+                   "task", "编写测试", "waitingReason", "依赖的上游 Agent CodeBot 执行失败")
+        );
+
+        String prompt = service.buildAggregationPrompt("构建一个登录页", results);
+
+        assertThat(prompt).contains("构建一个登录页");
+        assertThat(prompt).contains("✅ DesignBot");
+        assertThat(prompt).contains("❌ CodeBot");
+        assertThat(prompt).contains("⏸ TestBot");
+        assertThat(prompt).contains("CLI 启动超时");
+        assertThat(prompt).contains("这是设计稿内容");
     }
 
     // ── helpers ──
