@@ -701,8 +701,8 @@ public class ChatController {
                                     if (c == '\n') {
                                         String line = lineBuffer.toString();
                                         lineBuffer.setLength(0);
-                                        mentionDispatcher.dispatchIfComplete(convDbId, convId,
-                                                agentNameMap, line, groupSemaphore);
+                                        mentionDispatcher.collectLine(convDbId, convId,
+                                                agentNameMap, line);
                                     } else {
                                         lineBuffer.append(c);
                                     }
@@ -711,11 +711,12 @@ public class ChatController {
                                 return new AgentService.StreamDelta(text, null);
                             })
                             .doOnComplete(() -> {
-                                // Flush remaining buffer on stream completion
+                                // Flush remaining buffer and execute DAG
                                 if (lineBuffer.length() > 0) {
-                                    mentionDispatcher.dispatchIfComplete(convDbId, convId,
-                                            agentNameMap, lineBuffer.toString(), groupSemaphore);
+                                    mentionDispatcher.collectLine(convDbId, convId,
+                                            agentNameMap, lineBuffer.toString());
                                 }
+                                mentionDispatcher.executeCollected(convId, groupSemaphore);
                             })
                             .doOnError(err -> {
                                 log.error("arther-agent orchestrator stream failed for group {}: {}",
