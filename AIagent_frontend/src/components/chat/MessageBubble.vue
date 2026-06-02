@@ -91,15 +91,25 @@ watch(isStreaming, (newVal, oldVal) => {
 
 <template>
   <div class="message-row" :class="{ 'is-user': isUser }" :id="'msg-' + message.id">
-    <NAvatar
+    <NImage
       v-if="!isUser"
-      :size="32"
       :src="message.senderAgentAvatarUrl"
-      round
-      class="msg-avatar"
+      :width="32"
+      :height="32"
+      :preview-disabled="!message.senderAgentAvatarUrl"
+      object-fit="cover"
+      style="border-radius: 50%; flex-shrink: 0; margin-top: 2px"
     >
-      {{ (message.senderAgentName || 'AI')[0] }}
-    </NAvatar>
+      <template #placeholder>
+        <NAvatar
+          :size="32"
+          round
+          class="msg-avatar"
+        >
+          {{ (message.senderAgentName || 'AI')[0] }}
+        </NAvatar>
+      </template>
+    </NImage>
 
     <div class="msg-body" :class="[`msg-type-${message.messageType}`]">
       <div v-if="!isUser && message.senderAgentName" class="msg-agent-name">
