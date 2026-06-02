@@ -201,6 +201,7 @@ const agentDetail = computed(() =>
 
 const fileInput = ref(null)
 const uploadMsg = ref('')
+const uploading = ref(false)
 
 function triggerUpload() {
   fileInput.value?.click()
@@ -209,6 +210,11 @@ function triggerUpload() {
 async function handleAvatarUpload(e) {
   const file = e.target.files[0]
   if (!file) return
+
+  console.log('[AvatarUpload] Starting upload:', file.name, file.size, file.type)
+  uploading.value = true
+  uploadMsg.value = ''
+
   try {
     const formData = new FormData()
     formData.append('file', file)
@@ -229,12 +235,17 @@ async function handleAvatarUpload(e) {
       throw new Error(errData.message || `上传失败 (${res.status})`)
     }
 
+    console.log('[AvatarUpload] Upload success, reloading detail...')
     store.detailCache.delete(agentId.value)
     await store.loadDetail(agentId.value)
-  } catch (err) {
-    uploadMsg.value = err.message || '头像上传失败'
+    uploadMsg.value = '头像已更新'
     setTimeout(() => { uploadMsg.value = '' }, 3000)
+  } catch (err) {
+    console.error('[AvatarUpload] Upload failed:', err)
+    uploadMsg.value = err.message || '头像上传失败'
+    setTimeout(() => { uploadMsg.value = '' }, 5000)
   } finally {
+    uploading.value = false
     e.target.value = ''
   }
 }
@@ -252,7 +263,7 @@ async function handleAvatarUpload(e) {
         <NAvatar v-if="agentId === 'new'" :size="80" round :src="null" class="avatar">
 	          {{ (name || 'AI')[0] }}
 	        </NAvatar>
-	        <div v-else class="avatar-upload" @click="triggerUpload">
+	        <div v-else class="avatar-upload" @click="triggerUpload" :class="{ uploading }">
           <NAvatar :size="80" round :src="agentDetail.avatarUrl" :fallback="(agentDetail.name || 'AI')[0]" />
           <div class="avatar-overlay">
             <NIcon :component="CameraOutline" />
@@ -262,7 +273,7 @@ async function handleAvatarUpload(e) {
             ref="fileInput"
             type="file"
             accept="image/*"
-            style="display:none"
+            style="position: absolute; width: 0; height: 0; overflow: hidden; opacity: 0"
             @change="handleAvatarUpload"
           />
         </div>
@@ -443,5 +454,9 @@ async function handleAvatarUpload(e) {
 }
 .avatar-upload:hover .avatar-overlay {
   opacity: 1;
+}
+.avatar-upload.uploading {
+  pointer-events: none;
+  opacity: 0.6;
 }
 </style>
