@@ -33,6 +33,7 @@ const dirPickerPath = ref('')
 const dirPickerDirs = ref([])
 const dirPickerBreadcrumb = ref([])
 const dirPickerLoading = ref(false)
+const dirPickerParent = ref(null)
 const dirPickerError = ref('')
 let loadSeq = 0
 
@@ -66,7 +67,7 @@ onMounted(async () => {
   nickname.value = authStore.nickname || ''
   loadTokens()
   // Ensure workspace store is loaded before reading basePath
-  if (workspaceStore.activeId == null) {
+  if (workspaceStore.activeId == null || workspaceStore.workspaces.length === 0) {
     await workspaceStore.loadAndSelect()
   }
   basePath.value = workspaceStore.activeWorkspace?.basePath || ''
@@ -178,6 +179,7 @@ async function loadDirs(targetPath) {
     if (seq !== loadSeq) return
     dirPickerPath.value = result.path
     dirPickerDirs.value = result.dirs || []
+    dirPickerParent.value = result.parent || null
 
     const crumbs = [{ label: '根目录', path: '' }]
     if (result.path) {
@@ -213,6 +215,7 @@ function closeDirPicker() {
   dirPickerVisible.value = false
   dirPickerDirs.value = []
   dirPickerBreadcrumb.value = []
+  dirPickerParent.value = null
   dirPickerError.value = ''
 }
 </script>
@@ -338,9 +341,9 @@ function closeDirPicker() {
     <NModal v-model:show="dirPickerVisible" title="选择工作目录" style="width: 520px;">
       <div style="padding: 12px 0;">
         <div style="display: flex; align-items: center; gap: 2px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px;">
-          <span style="color: #666; margin-right: 4px;">路径：</span>
+          <span style="color: #333; margin-right: 4px;">路径：</span>
           <template v-for="(crumb, idx) in dirPickerBreadcrumb" :key="idx">
-            <span v-if="idx > 0" style="color: #999;">&rsaquo;</span>
+            <span v-if="idx > 0" style="color: #666;">&rsaquo;</span>
             <NButton
               text
               size="tiny"
@@ -355,20 +358,27 @@ function closeDirPicker() {
         <div v-if="dirPickerError" style="margin-bottom: 8px; font-size: 13px; color: #FF3B30;">{{ dirPickerError }}</div>
 
         <div style="max-height: 300px; overflow-y: auto; border: 1px solid #e8e8e8; border-radius: 6px;">
-          <div v-if="dirPickerLoading" style="padding: 40px; text-align: center; color: #999;">加载中...</div>
-          <div v-else-if="dirPickerDirs.length === 0 && !dirPickerError" style="padding: 40px; text-align: center; color: #999;">此目录为空或无法访问</div>
-          <div
-            v-else
-            v-for="entry in dirPickerDirs"
-            :key="entry.path"
-            style="padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px;"
-            :style="{ background: entry.path === basePath ? '#e6f7ff' : 'transparent' }"
-            @click="navigateToDir(entry.path)"
-          >
-            <span style="font-size: 16px;">&#x1F4C1;</span>
-            <span style="flex: 1;">{{ entry.name }}</span>
-            <NButton size="tiny" @click.stop="selectDir(entry.path)">选择</NButton>
-          </div>
+          <div v-if="dirPickerLoading" style="padding: 40px; text-align: center; color: #666;">加载中...</div>
+          <div v-else-if="dirPickerDirs.length === 0 && !dirPickerError && !dirPickerParent" style="padding: 40px; text-align: center; color: #666;">此目录为空或无法访问</div>
+          <template v-else>
+            <div v-if="dirPickerParent"
+              style="padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px;"
+              @click="navigateToDir(dirPickerParent)">
+              <span style="font-size: 16px;">&#x1F4C2;</span>
+              <span style="flex: 1; color: #1890ff;">返回上级</span>
+            </div>
+            <div
+              v-for="entry in dirPickerDirs"
+              :key="entry.path"
+              style="padding: 8px 12px; display: flex; align-items: center; gap: 8px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 14px;"
+              :style="{ background: entry.path === basePath ? '#e6f7ff' : 'transparent' }"
+              @click="navigateToDir(entry.path)"
+            >
+              <span style="font-size: 16px;">&#x1F4C1;</span>
+              <span style="flex: 1;">{{ entry.name }}</span>
+              <NButton size="tiny" @click.stop="selectDir(entry.path)">选择</NButton>
+            </div>
+          </template>
         </div>
       </div>
 

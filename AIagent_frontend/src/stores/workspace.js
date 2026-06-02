@@ -24,9 +24,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
         localStorage.setItem('ai_agent_workspace_id', String(id))
       }
     } catch {
-      if (stored) {
-        activeId.value = Number(stored)
-      }
+      // 失败时保持 activeId 为 null，让调用方可以重试
     }
   }
 
