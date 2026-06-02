@@ -67,6 +67,9 @@ public class MessageVO {
     /** 发送者 Agent 名称 */
     private String senderAgentName;
 
+    /** 发送者 Agent 头像 URL */
+    private String senderAgentAvatarUrl;
+
     /** 关联产物引用列表（JSON 数组字符串） */
     private String artifactRefs;
 

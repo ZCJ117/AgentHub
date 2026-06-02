@@ -1413,25 +1413,33 @@ public class ConversationService {
         }
     }
 
-    private Map<Long, String> buildAgentNameMap(List<MessageEntity> messages) {
+    private record AgentInfoMaps(Map<Long, String> nameMap, Map<Long, String> avatarMap) {}
+
+    private AgentInfoMaps buildAgentInfoMaps(List<MessageEntity> messages) {
         Set<Long> agentIds = messages.stream()
                 .map(MessageEntity::getSenderAgentId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         if (agentIds.isEmpty()) {
-            return Map.of();
+            return new AgentInfoMaps(Map.of(), Map.of());
         }
-        return agentMapper.selectBatchIds(agentIds).stream()
+        List<AgentEntity> agents = agentMapper.selectBatchIds(agentIds);
+        Map<Long, String> nameMap = agents.stream()
                 .collect(Collectors.toMap(AgentEntity::getId, AgentEntity::getName));
+        Map<Long, String> avatarMap = agents.stream()
+                .filter(a -> a.getAvatarUrl() != null)
+                .collect(Collectors.toMap(AgentEntity::getId, AgentEntity::getAvatarUrl));
+        return new AgentInfoMaps(nameMap, avatarMap);
     }
 
     public List<MessageVO> toMessageViews(List<MessageEntity> messages) {
-        Map<Long, String> nameMap = buildAgentNameMap(messages);
+        AgentInfoMaps infoMaps = buildAgentInfoMaps(messages);
         return messages.stream()
                 .map(m -> MessageVO.from(m, parseMessageParts(m), renderMessageContent(m)))
                 .peek(vo -> {
                     if (vo.getSenderAgentId() != null) {
-                        vo.setSenderAgentName(nameMap.get(vo.getSenderAgentId()));
+                        vo.setSenderAgentName(infoMaps.nameMap().get(vo.getSenderAgentId()));
+                        vo.setSenderAgentAvatarUrl(infoMaps.avatarMap().get(vo.getSenderAgentId()));
                     }
                 })
                 .toList();
