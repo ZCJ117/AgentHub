@@ -82,7 +82,7 @@ public class ConversationVO extends ConversationEntity {
      * @param agentIcon   关联 Agent 图标（可为 null）
      * @return ConversationVO
      */
-    public static ConversationVO from(ConversationEntity entity, String agentName, String agentIcon) {
+    public static ConversationVO from(ConversationEntity entity, String agentName, String agentIcon, String agentAvatarUrl) {
         ConversationVO vo = new ConversationVO();
         // 复制实体字段
         vo.setId(entity.getId());
@@ -109,6 +109,7 @@ public class ConversationVO extends ConversationEntity {
         // 补充关联字段
         vo.setAgentName(agentName != null ? agentName : "未知 Agent");
         vo.setAgentIcon(agentIcon != null ? agentIcon : "🤖");
+        vo.setAgentAvatarUrl(agentAvatarUrl);
         // 流状态
         vo.setStreamStatus(entity.getStreamStatus() != null ? entity.getStreamStatus() : "idle");
         // 计算状态：24 小时内活跃为 active，否则为 closed
