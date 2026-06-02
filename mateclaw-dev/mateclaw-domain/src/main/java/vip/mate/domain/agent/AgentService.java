@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
@@ -55,6 +56,9 @@ public class AgentService {
      *  to keep this a leaf dependency with no risk of a bean cycle. */
     private final ConversationMapper conversationMapper;
     private final MessageMapper messageMapper;
+
+    @Value("${mateclaw.workspace.base-dir:./workspace}")
+    private String baseDir;
 
     /** Field-injected publisher for agent_lifecycle trigger events; the
      *  trigger module's bridge listens and forwards into ingest. */
@@ -274,7 +278,8 @@ public class AgentService {
             if (contentType.contains("jpeg") || contentType.contains("jpg")) ext = ".jpg";
             else if (contentType.contains("gif")) ext = ".gif";
             else if (contentType.contains("webp")) ext = ".webp";
-            java.nio.file.Path dir = java.nio.file.Paths.get("./workspace/avatars", agentId.toString());
+            java.nio.file.Path dir = java.nio.file.Paths.get(baseDir, "avatars", agentId.toString())
+                    .toAbsolutePath();
             java.nio.file.Files.createDirectories(dir);
             java.nio.file.Path target = dir.resolve(filename + ext);
             file.transferTo(target.toFile());

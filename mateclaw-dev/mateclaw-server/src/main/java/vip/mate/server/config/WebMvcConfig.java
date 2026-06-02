@@ -1,5 +1,7 @@
 package vip.mate.server.config;
 
+import java.nio.file.Paths;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -27,6 +29,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     /** CORS allowed origins, comma-separated. Default "*" for dev, restrict in production. */
     @Value("${mateclaw.cors.allowed-origins:*}")
     private String allowedOrigins;
+
+    @Value("${mateclaw.workspace.base-dir:./workspace}")
+    private String baseDir;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
@@ -58,7 +63,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/skill-assets/**")
                 .addResourceLocations("classpath:/skills/")
                 .setCachePeriod(86400);
+        String baseUri = Paths.get(baseDir).toAbsolutePath().toUri().toString();
         registry.addResourceHandler("/avatars/**")
-                .addResourceLocations("file:./workspace/avatars/");
+                .addResourceLocations(baseUri + "/avatars/");
     }
 }
