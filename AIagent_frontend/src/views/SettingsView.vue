@@ -66,16 +66,20 @@ onMounted(async () => {
   await authStore.refreshProfile()
   nickname.value = authStore.nickname || ''
   loadTokens()
-  // Ensure workspace store is loaded before reading basePath
+  // Always reload workspace to get latest basePath from database
   if (workspaceStore.activeId == null || workspaceStore.workspaces.length === 0) {
     await workspaceStore.loadAndSelect()
+  } else {
+    await workspaceStore.refresh()
   }
-  basePath.value = workspaceStore.activeWorkspace?.basePath || ''
+  // Read basePath directly from loaded data to avoid computed timing edge case
+  const ws = workspaceStore.workspaces.find(w => w.id === workspaceStore.activeId)
+  basePath.value = ws?.basePath || ''
 })
 
 watch(() => workspaceStore.activeWorkspace, (ws) => {
   basePath.value = ws?.basePath || ''
-})
+}, { immediate: true })
 
 async function loadTokens() {
   try {
