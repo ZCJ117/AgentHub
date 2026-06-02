@@ -86,7 +86,12 @@
       "Bash(mvn spring-boot:run -q)",
       "Bash(curl -s http://localhost:18088/api/v1/agents)",
       "Bash(mvn spring-boot:run -Dmaven.test.skip=true -q)",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:18088/api/v1/agents)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:18088/api/v1/agents)",
+      "Bash(echo \"EXIT:$?\")",
+      "WebFetch(domain:github.com)",
+      "Bash(gh repo *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)"
     ]
   }
 }
