@@ -201,6 +201,7 @@ const agentDetail = computed(() =>
 
 const fileInput = ref(null)
 const uploadMsg = ref('')
+const uploadMsgType = ref('msg-error')
 const uploading = ref(false)
 
 function triggerUpload() {
@@ -239,10 +240,12 @@ async function handleAvatarUpload(e) {
     store.detailCache.delete(agentId.value)
     await store.loadDetail(agentId.value)
     uploadMsg.value = '头像已更新'
+    uploadMsgType.value = 'msg-success'
     setTimeout(() => { uploadMsg.value = '' }, 3000)
   } catch (err) {
     console.error('[AvatarUpload] Upload failed:', err)
     uploadMsg.value = err.message || '头像上传失败'
+    uploadMsgType.value = 'msg-error'
     setTimeout(() => { uploadMsg.value = '' }, 5000)
   } finally {
     uploading.value = false
@@ -277,7 +280,7 @@ async function handleAvatarUpload(e) {
             @change="handleAvatarUpload"
           />
         </div>
-        <span v-if="uploadMsg" style="color: #FF3B30; font-size: 12px; display: block; margin-top: 6px; text-align: center;">{{ uploadMsg }}</span>
+        <span v-if="uploadMsg" :class="uploadMsgType" style="font-size: 12px; display: block; margin-top: 6px; text-align: center;">{{ uploadMsg }}</span>
 	        <NInput v-model:value="name" placeholder="Agent 名称" class="name-input" />
         <NInput v-model:value="description" placeholder="简短描述" type="textarea" :rows="2" />
         <NSpace style="margin-top: 12px">
@@ -459,4 +462,6 @@ async function handleAvatarUpload(e) {
   pointer-events: none;
   opacity: 0.6;
 }
+.msg-success { color: #34C759; }
+.msg-error { color: #FF3B30; }
 </style>

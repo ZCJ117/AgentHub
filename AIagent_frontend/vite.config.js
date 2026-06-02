@@ -15,6 +15,10 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:18088',
         changeOrigin: true
+      },
+      '/avatars': {
+        target: 'http://127.0.0.1:18088',
+        changeOrigin: true
       }
     }
   },
