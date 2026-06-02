@@ -13,7 +13,9 @@ import vip.mate.common.result.R;
 import vip.mate.common.exception.MateClawException;
 import vip.mate.domain.workspace.core.annotation.RequireGlobalAdmin;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 认证接口
@@ -46,6 +48,30 @@ public class AuthController {
     @RequireGlobalAdmin
     public R<UserEntity> createUser(@RequestBody UserEntity user) {
         return R.ok(authService.createUser(user));
+    }
+
+    @Operation(summary = "获取当前用户信息")
+    @GetMapping("/me")
+    public R<Map<String, Object>> me(Authentication auth) {
+        UserEntity user = authService.findByUsername(auth.getName());
+        Map<String, Object> result = new HashMap<>();
+        result.put("nickname", user.getNickname());
+        result.put("role", user.getRole());
+        return R.ok(result);
+    }
+
+    @Operation(summary = "更新当前用户信息")
+    @PutMapping("/me")
+    public R<Void> updateMe(@RequestBody Map<String, Object> body, Authentication auth) {
+        UserEntity user = authService.findByUsername(auth.getName());
+        if (body.containsKey("nickname")) {
+            user.setNickname(body.get("nickname").toString());
+        }
+        if (body.containsKey("email")) {
+            user.setEmail(body.get("email").toString());
+        }
+        authService.updateProfile(user);
+        return R.ok();
     }
 
     @Operation(summary = "修改密码")

@@ -121,6 +121,13 @@ public class AuthService {
     }
 
     /**
+     * 更新用户基本信息（昵称、邮箱等）
+     */
+    public void updateProfile(UserEntity user) {
+        userMapper.updateById(user);
+    }
+
+    /**
      * 解析 Token 获取用户名
      */
     public String parseToken(String token) {

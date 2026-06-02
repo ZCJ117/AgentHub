@@ -66,11 +66,8 @@ onMounted(async () => {
   await authStore.refreshProfile()
   nickname.value = authStore.nickname || ''
   loadTokens()
-  // Always reload workspace to get latest basePath from database
   if (workspaceStore.activeId == null || workspaceStore.workspaces.length === 0) {
     await workspaceStore.loadAndSelect()
-  } else {
-    await workspaceStore.refresh()
   }
   // Read basePath directly from loaded data to avoid computed timing edge case
   const ws = workspaceStore.workspaces.find(w => w.id === workspaceStore.activeId)
