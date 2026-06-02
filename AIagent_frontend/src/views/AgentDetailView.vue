@@ -239,6 +239,7 @@ async function handleAvatarUpload(e) {
     console.log('[AvatarUpload] Upload success, reloading detail...')
     store.detailCache.delete(agentId.value)
     await store.loadDetail(agentId.value)
+    await store.loadAgents()
     uploadMsg.value = '头像已更新'
     uploadMsgType.value = 'msg-success'
     setTimeout(() => { uploadMsg.value = '' }, 3000)
