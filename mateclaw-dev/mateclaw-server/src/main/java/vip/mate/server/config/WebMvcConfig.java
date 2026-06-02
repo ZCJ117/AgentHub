@@ -58,5 +58,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addResourceHandler("/skill-assets/**")
                 .addResourceLocations("classpath:/skills/")
                 .setCachePeriod(86400);
+        registry.addResourceHandler("/avatars/**")
+                .addResourceLocations("file:./workspace/avatars/");
     }
 }
