@@ -45,7 +45,7 @@ public class FileSystemService {
         }
 
         List<DirEntry> entries = Arrays.stream(children)
-                .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
+                .sorted((a, b) -> a.name().compareToIgnoreCase(b.name()))
                 .map(f -> new DirEntry(f.getName(), f.getAbsolutePath()))
                 .toList();
 
@@ -61,14 +61,14 @@ public class FileSystemService {
             for (File root : File.listRoots()) {
                 entries.add(new DirEntry(root.getPath(), root.getPath()));
             }
-            entries.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+            entries.sort((a, b) -> a.name().compareToIgnoreCase(b.name()));
         } else {
             // Unix: list / children
             File rootDir = new File("/");
             File[] children = rootDir.listFiles(File::isDirectory);
             if (children != null) {
                 entries = Arrays.stream(children)
-                        .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
+                        .sorted((a, b) -> a.name().compareToIgnoreCase(b.name()))
                         .map(f -> new DirEntry(f.getName(), f.getAbsolutePath()))
                         .toList();
             }
