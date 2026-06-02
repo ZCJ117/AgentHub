@@ -200,6 +200,7 @@ public class AgentMentionDispatcher {
             startEvent.put("agentName", node.agentName);
             startEvent.put("agentId", String.valueOf(node.dagTask.agent.getId()));
             startEvent.put("taskDescription", node.dagTask.task);
+            startEvent.put("avatarUrl", node.dagTask.agent.getAvatarUrl());
             if (node.dagTask.dependsOnAgentName != null) {
                 startEvent.put("dependsOn", node.dagTask.dependsOnAgentName);
             }
@@ -281,7 +282,8 @@ public class AgentMentionDispatcher {
         streamTracker.broadcastObject(conversationId, "agent_message_start", Map.of(
                 "agentName", agentName,
                 "agentId", String.valueOf(agent.getId()),
-                "taskDescription", task
+                "taskDescription", task,
+                "avatarUrl", agent.getAvatarUrl()
         ));
 
         scheduleNode(node, conversationId, semaphore, () -> {
@@ -522,6 +524,7 @@ public class AgentMentionDispatcher {
 
                 // 5. Look up Agent01 entity (needed for agent_message_start and message persistence)
                 final String[] orchestratorAgentId = {null};
+                final AgentEntity[] agent01Holder = {null};
                 try {
                     var wrapper = new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<AgentEntity>()
                             .eq(AgentEntity::getName, "Agent01");
@@ -529,6 +532,7 @@ public class AgentMentionDispatcher {
                             .stream().findFirst().orElse(null);
                     if (agent01 != null) {
                         orchestratorAgentId[0] = String.valueOf(agent01.getId());
+                        agent01Holder[0] = agent01;
                     }
                 } catch (Exception e) {
                     log.warn("[Dispatcher] Failed to look up Agent01: {}", e.getMessage());
@@ -538,7 +542,8 @@ public class AgentMentionDispatcher {
                 streamTracker.broadcastObject(conversationId, "agent_message_start", Map.of(
                         "agentName", "Agent01",
                         "agentId", orchestratorAgentId[0] != null ? orchestratorAgentId[0] : "0",
-                        "taskDescription", "任务执行结果汇总"
+                        "taskDescription", "任务执行结果汇总",
+                        "avatarUrl", agent01Holder[0] != null ? agent01Holder[0].getAvatarUrl() : null
                 ));
 
                 // 6. Call Agent01 and stream the summary
