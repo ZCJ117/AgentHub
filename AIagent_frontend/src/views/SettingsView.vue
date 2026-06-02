@@ -338,7 +338,7 @@ function closeDirPicker() {
       </template>
     </NModal>
 
-    <NModal v-model:show="dirPickerVisible" title="选择工作目录" style="width: 520px;">
+    <NModal v-model:show="dirPickerVisible" title="选择工作目录" preset="card" style="width: 520px;">
       <div style="padding: 12px 0;">
         <div style="display: flex; align-items: center; gap: 2px; flex-wrap: wrap; margin-bottom: 12px; font-size: 13px;">
           <span style="color: #333; margin-right: 4px;">路径：</span>
