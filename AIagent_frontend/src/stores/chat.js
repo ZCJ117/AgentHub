@@ -285,6 +285,7 @@ export const useChatStore = defineStore('chat', () => {
         status: hasDependency ? 'waiting' : 'streaming',
         senderAgentName: data.agentName,
         senderAgentId: data.agentId,
+        senderAgentAvatarUrl: data.avatarUrl || null,
         dependsOn: data.dependsOn || null
       })
       agentStreams.value.set(data.agentName, agentId)
