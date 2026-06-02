@@ -309,14 +309,16 @@ public class ConversationController {
 
         String agentName = null;
         String agentIcon = null;
+        String agentAvatarUrl = null;
         if (conv.getAgentId() != null) {
             AgentEntity agent = agentMapper.selectById(conv.getAgentId());
             if (agent != null) {
                 agentName = agent.getName();
                 agentIcon = agent.getIcon();
+                agentAvatarUrl = agent.getAvatarUrl();
             }
         }
-        ConversationVO vo = ConversationVO.from(conv, agentName, agentIcon);
+        ConversationVO vo = ConversationVO.from(conv, agentName, agentIcon, agentAvatarUrl);
 
         List<Map<String, Object>> members = List.of();
         if ("group".equals(conv.getConversationType())) {

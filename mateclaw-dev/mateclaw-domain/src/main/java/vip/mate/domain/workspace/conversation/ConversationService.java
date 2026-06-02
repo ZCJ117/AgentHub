@@ -160,7 +160,8 @@ public class ConversationService {
                             : null;
                     String agentName = agent != null ? agent.getName() : null;
                     String agentIcon = agent != null ? agent.getIcon() : null;
-                    return ConversationVO.from(entity, agentName, agentIcon);
+                    String agentAvatarUrl = agent != null ? agent.getAvatarUrl() : null;
+                    return ConversationVO.from(entity, agentName, agentIcon, agentAvatarUrl);
                 })
                 .collect(Collectors.toList());
     }
@@ -229,7 +230,8 @@ public class ConversationService {
                             : null;
                     String agentName = agent != null ? agent.getName() : null;
                     String agentIcon = agent != null ? agent.getIcon() : null;
-                    return ConversationVO.from(entity, agentName, agentIcon);
+                    String agentAvatarUrl = agent != null ? agent.getAvatarUrl() : null;
+                    return ConversationVO.from(entity, agentName, agentIcon, agentAvatarUrl);
                 })
                 .collect(Collectors.toList()));
         return voPage;
