@@ -60,6 +60,35 @@ public class ConversationController {
     }
 
     /**
+     * 预创建单聊会话。
+     * 在发送第一条消息前创建会话记录，生成 UUID 作为 conversationId，
+     * 使会话立即出现在侧边栏并可持久化。
+     */
+    @Operation(summary = "创建单聊会话")
+    @PostMapping
+    public R<Map<String, Object>> create(
+            Authentication auth,
+            @RequestHeader(value = "X-Workspace-Id", required = false) Long workspaceId,
+            @RequestBody Map<String, Object> body) {
+        String username = auth != null ? auth.getName() : "anonymous";
+        Long agentId = body.get("agentId") != null ? Long.valueOf(body.get("agentId").toString()) : null;
+        String title = body.get("title") != null ? body.get("title").toString().trim() : "";
+        if (agentId == null || title.isEmpty()) {
+            return R.fail("agentId 和 title 必填");
+        }
+        if (title.length() > 100) {
+            return R.fail("标题不能超过100字符");
+        }
+        var conv = conversationService.createDirectConversation(agentId, title, username, workspaceId);
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("conversationId", conv.getConversationId());
+        data.put("title", conv.getTitle());
+        data.put("agentId", conv.getAgentId());
+        data.put("conversationType", conv.getConversationType());
+        return R.ok(data);
+    }
+
+    /**
      * 分页查询会话列表（用于会话管理页）。
      * <p>会话管理页可能跨多个 IM 渠道，单页全量返回会拖慢首屏。
      */
