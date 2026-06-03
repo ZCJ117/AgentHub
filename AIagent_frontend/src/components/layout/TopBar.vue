@@ -5,8 +5,14 @@ import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
 import BrandMark from '@/components/common/BrandMark.vue'
 import UserPill from './UserPill.vue'
-import { BusinessOutline, ChevronDownOutline } from '@vicons/ionicons5'
-import { NButton, NDropdown, NIcon } from 'naive-ui'
+import {
+  BusinessOutline, ChevronDownOutline,
+  HardwareChipOutline, CubeOutline, SettingsOutline,
+  AddOutline, ChatbubbleOutline, PeopleOutline
+} from '@vicons/ionicons5'
+import { NButton, NDropdown, NIcon, NTooltip } from 'naive-ui'
+import { h } from 'vue'
+import { useAgentSelector } from '@/composables/useAgentSelector'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,9 +20,9 @@ const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
 
 const navItems = [
-  { key: 'agents',  label: 'Agent',  path: '/agents' },
-  { key: 'artifacts', label: '产物',  path: '/artifacts' },
-  { key: 'settings',  label: '设置',  path: '/settings' }
+  { key: 'agents',    icon: HardwareChipOutline, tooltip: 'Agent', path: '/agents' },
+  { key: 'artifacts', icon: CubeOutline,         tooltip: '产物',  path: '/artifacts' },
+  { key: 'settings',  icon: SettingsOutline,     tooltip: '设置',  path: '/settings' }
 ]
 
 const activeKey = computed(() => {
@@ -29,6 +35,25 @@ const activeKey = computed(() => {
 
 function navigate(item) {
   router.push(item.path)
+}
+
+const { openAgentSelector } = useAgentSelector()
+
+const createOptions = [
+  {
+    key: 'direct',
+    label: '新建对话',
+    icon: () => h(NIcon, { component: ChatbubbleOutline })
+  },
+  {
+    key: 'group',
+    label: '新建群聊',
+    icon: () => h(NIcon, { component: PeopleOutline })
+  }
+]
+
+function handleCreate(key) {
+  openAgentSelector(key)
 }
 
 function handleLogout() {
@@ -54,16 +79,25 @@ function handleSwitchWorkspace(id) {
       <BrandMark size="sm" />
 
       <nav class="nav-segment">
-        <button
-          v-for="item in navItems"
-          :key="item.key"
-          class="nav-pill"
-          :class="{ active: activeKey === item.key }"
-          @click="navigate(item)"
-        >
-          {{ item.label }}
-        </button>
+        <NTooltip v-for="item in navItems" :key="item.key">
+          <template #trigger>
+            <button
+              class="nav-pill"
+              :class="{ active: activeKey === item.key }"
+              @click="navigate(item)"
+            >
+              <NIcon :component="item.icon" size="18" />
+            </button>
+          </template>
+          {{ item.tooltip }}
+        </NTooltip>
       </nav>
+
+      <NDropdown trigger="click" :options="createOptions" @select="handleCreate">
+        <button class="create-btn">
+          <NIcon :component="AddOutline" size="20" />
+        </button>
+      </NDropdown>
 
       <div class="spacer" />
 
@@ -162,5 +196,26 @@ function handleSwitchWorkspace(id) {
 }
 .workspace-switcher:hover {
   background: #E8E8ED;
+}
+
+.create-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid #C6C6C8;
+  background: transparent;
+  color: #8E8E93;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.1, 0.25, 1);
+  padding: 0;
+  flex-shrink: 0;
+}
+.create-btn:hover {
+  border-color: #1a73e8;
+  color: #1a73e8;
+  background: rgba(26, 115, 232, 0.06);
 }
 </style>
