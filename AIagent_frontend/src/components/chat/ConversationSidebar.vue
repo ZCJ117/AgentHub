@@ -29,11 +29,6 @@ function selectConversation(idOrConv) {
   router.push(`/chat/${id}`)
 }
 
-function newDirectChat() {
-  convStore.setActive(null)
-  router.push('/chat')
-}
-
 async function handleCreateConversation(config) {
   console.log('[Sidebar] handleCreateConversation config:', config)
   showAgentSelector.value = false
@@ -153,12 +148,7 @@ function handleContextMenu(key, conv) {
           @click="selectConversation(conv)"
         >
           <div class="conv-content">
-            <NAvatar v-if="conv.agentAvatarUrl" :size="40" :src="conv.agentAvatarUrl" round>
-              <template #fallback>
-                {{ (conv.title || conv.agentName || '?')[0] }}
-              </template>
-            </NAvatar>
-            <NAvatar v-else :size="40" round>
+            <NAvatar :size="40" :src="conv.agentAvatarUrl" round>
               {{ (conv.title || conv.agentName || '?')[0] }}
             </NAvatar>
             <div class="conv-info">
