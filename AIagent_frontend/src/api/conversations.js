@@ -36,6 +36,10 @@ export function createGroupConversation(body) {
   return apiClient.post('/api/v1/conversations/group', body)
 }
 
+export function createDirectConversation(body) {
+  return apiClient.post('/api/v1/conversations', body)
+}
+
 export function fetchPinnedMessages(id) {
   return apiClient.get(`/api/v1/conversations/${id}/pins`)
 }
