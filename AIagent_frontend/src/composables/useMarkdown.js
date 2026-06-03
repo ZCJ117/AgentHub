@@ -69,20 +69,21 @@ export function preprocessText(text) {
       continue
     }
 
+    // 列表项（必须在标题候选之前，避免短列表项被误判为标题）
+    if (isListItem(line)) {
+      flushParagraph()
+      inList = true
+      result.push(line)
+      afterBlank = false
+      continue
+    }
+
+
     // 空行后的候选标题
     if (afterBlank && isHeadingCandidate(line.trimEnd())) {
       flushParagraph()
       flushList()
       result.push('## ' + line)
-      afterBlank = false
-      continue
-    }
-
-    // 列表项
-    if (isListItem(line)) {
-      flushParagraph()
-      inList = true
-      result.push(line)
       afterBlank = false
       continue
     }
