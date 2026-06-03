@@ -1,19 +1,19 @@
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
 import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSpin } from 'naive-ui'
 import AgentSelector from '@/components/agent/AgentSelector.vue'
+import { useAgentSelector } from '@/composables/useAgentSelector'
 
 const router = useRouter()
 const convStore = useConversationStore()
 const chatStore = useChatStore()
 const agentStore = useAgentStore()
 
-const showAgentSelector = ref(false)
-const selectorMode = ref('direct')
+const { showAgentSelector, selectorMode, openAgentSelector } = useAgentSelector()
 
 onMounted(async () => {
   await Promise.all([convStore.loadList(), agentStore.loadAgents()])
@@ -115,14 +115,6 @@ function handleContextMenu(key, conv) {
   <aside class="sidebar">
     <div class="sidebar-header">
       <NSpace vertical :size="8" style="width: 100%">
-        <NSpace :size="8" style="width: 100%">
-          <NButton type="primary" block @click="selectorMode = 'direct'; showAgentSelector = true">
-            + 新建对话
-          </NButton>
-          <NButton block @click="selectorMode = 'group'; showAgentSelector = true">
-            + 新建群聊
-          </NButton>
-        </NSpace>
         <div class="type-filter">
           <NButton
             v-for="opt in [
@@ -161,11 +153,12 @@ function handleContextMenu(key, conv) {
           @click="selectConversation(conv)"
         >
           <div class="conv-content">
-            <NAvatar
-              :size="40"
-              :src="conv.agentAvatarUrl"
-              round
-            >
+            <NAvatar v-if="conv.agentAvatarUrl" :size="40" :src="conv.agentAvatarUrl" round>
+              <template #fallback>
+                {{ (conv.title || conv.agentName || '?')[0] }}
+              </template>
+            </NAvatar>
+            <NAvatar v-else :size="40" round>
               {{ (conv.title || conv.agentName || '?')[0] }}
             </NAvatar>
             <div class="conv-info">
