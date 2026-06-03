@@ -2,15 +2,14 @@
 import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
-import { useChatStore } from '@/stores/chat'
 import { useAgentStore } from '@/stores/agent'
 import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSpin } from 'naive-ui'
+import { createDirectConversation } from '@/api/conversations'
 import AgentSelector from '@/components/agent/AgentSelector.vue'
 import { useAgentSelector } from '@/composables/useAgentSelector'
 
 const router = useRouter()
 const convStore = useConversationStore()
-const chatStore = useChatStore()
 const agentStore = useAgentStore()
 
 const { showAgentSelector, selectorMode, openAgentSelector } = useAgentSelector()
@@ -33,10 +32,16 @@ async function handleCreateConversation(config) {
   console.log('[Sidebar] handleCreateConversation config:', config)
   showAgentSelector.value = false
   if (config.mode === 'direct') {
-    agentStore.selectAgent(config.agentId)
-    convStore.setActive(null)
-    chatStore.clearMessages()
-    router.replace('/chat')
+    try {
+      const result = await createDirectConversation({ agentId: config.agentId, title: config.topic })
+      if (result?.conversationId) {
+        await convStore.loadList()
+        convStore.setActive(result.conversationId)
+        router.push(`/chat/${result.conversationId}`)
+      }
+    } catch (err) {
+      console.warn('Failed to create direct conversation:', err)
+    }
   } else {
     try {
       const result = await convStore.createGroup({
