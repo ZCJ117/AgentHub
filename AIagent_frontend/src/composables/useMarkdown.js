@@ -10,7 +10,7 @@ marked.setOptions({
 const TRAILING_PUNCT_RE = /[。.!！,，;；]$/
 const NUMBERED_LIST_RE = /^\d+[\.\)、]\s/
 const DASH_LIST_RE = /^[-*]\s/
-const MARKDOWN_MARKER_RE = /^(#{1,6}\s|>\s|```|~~~|\||[-*]\s|\d+[\.\)、]\s)/
+const MARKDOWN_MARKER_RE = /^(#{1,6}\s|>\s|```|~~~|\|)/
 
 function isHeadingCandidate(line) {
   if (line.length > 40) return false
@@ -32,7 +32,7 @@ export function preprocessText(text) {
   const result = []
   const paragraph = []
   let inList = false
-  let afterBlank = true
+  let afterBlank = false
 
   function flushParagraph() {
     if (paragraph.length > 0) {
