@@ -35,6 +35,7 @@ async function handleCreateConversation(config) {
     try {
       const result = await createDirectConversation({ agentId: config.agentId, title: config.topic })
       if (result?.conversationId) {
+        agentStore.selectAgent(config.agentId)
         await convStore.loadList()
         convStore.setActive(result.conversationId)
         router.push(`/chat/${result.conversationId}`)
