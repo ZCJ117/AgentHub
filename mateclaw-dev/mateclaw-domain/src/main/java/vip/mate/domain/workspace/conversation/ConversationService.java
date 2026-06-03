@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -279,6 +280,30 @@ public class ConversationService {
         } else if (!conv.getUsername().equals(username)) {
             throw new IllegalArgumentException("无权操作该会话");
         }
+        return conv;
+    }
+
+    /**
+     * Pre-create a direct-chat conversation before the first message is sent.
+     * Generates a UUID so the conversation appears in the sidebar immediately
+     * and the SSE flow can reuse it.
+     */
+    @Transactional
+    public ConversationEntity createDirectConversation(Long agentId, String title,
+                                                        String username, Long workspaceId) {
+        if (title == null || title.isBlank() || title.length() > 100) {
+            throw new IllegalArgumentException("标题不合法（1-100字符）");
+        }
+        ConversationEntity conv = new ConversationEntity();
+        conv.setConversationId(UUID.randomUUID().toString());
+        conv.setAgentId(agentId);
+        conv.setTitle(title.trim());
+        conv.setUsername(username != null ? username : "anonymous");
+        conv.setWorkspaceId(workspaceId != null ? workspaceId : 1L);
+        conv.setConversationType("direct");
+        conv.setMessageCount(0);
+        conv.setLastActiveTime(LocalDateTime.now());
+        conversationMapper.insert(conv);
         return conv;
     }
 
