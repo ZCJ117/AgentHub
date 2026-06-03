@@ -13,6 +13,7 @@ const emit = defineEmits(['close', 'create'])
 const selectedAgentId = ref(null)
 const selectedAgentIds = ref([])
 const groupTitle = ref('')
+const topic = ref('')
 const availableMembers = computed(() =>
   props.agents.filter(a => a.agentType !== 'orchestrator' && a.enabled !== false)
 )
@@ -28,8 +29,10 @@ function parseTags(tags) {
 function handleCreate() {
   if (props.mode === 'direct') {
     if (!selectedAgentId.value) return
-    console.log('[AgentSelector] create direct chat, agentId:', selectedAgentId.value)
-    emit('create', { agentId: selectedAgentId.value, mode: 'direct' })
+    if (!topic.value.trim()) return
+    console.log('[AgentSelector] create direct chat, agentId:', selectedAgentId.value, 'topic:', topic.value)
+    emit('create', { agentId: selectedAgentId.value, mode: 'direct', topic: topic.value.trim() })
+    topic.value = ''
   } else {
     if (selectedAgentIds.value.length < 2) return
     emit('create', {
@@ -47,6 +50,7 @@ function close() {
   selectedAgentId.value = null
   selectedAgentIds.value = []
   groupTitle.value = ''
+  topic.value = ''
   emit('close')
 }
 </script>
@@ -59,29 +63,37 @@ function close() {
       </h3>
 
       <!-- Direct mode: single agent selection with radio buttons -->
-      <div v-if="mode === 'direct'" class="agent-list">
-        <NRadioGroup v-model:value="selectedAgentId">
-          <div
-            v-for="agent in availableMembers"
-            :key="agent.id"
-            class="agent-option"
-            :class="{ selected: selectedAgentId === agent.id }"
-          >
-            <NRadio :value="agent.id" />
-            <NAvatar :size="36" round :src="agent.avatarUrl">
-              {{ (agent.name || 'AI')[0] }}
-            </NAvatar>
-            <div class="agent-info">
-              <span class="agent-name">{{ agent.name }}</span>
-              <span class="agent-desc">{{ agent.description || '' }}</span>
+      <div v-if="mode === 'direct'" class="direct-form">
+        <NInput
+          v-model:value="topic"
+          placeholder="输入对话主题"
+          maxlength="100"
+          style="margin-bottom: 12px"
+        />
+        <div class="agent-list">
+          <NRadioGroup v-model:value="selectedAgentId">
+            <div
+              v-for="agent in availableMembers"
+              :key="agent.id"
+              class="agent-option"
+              :class="{ selected: selectedAgentId === agent.id }"
+            >
+              <NRadio :value="agent.id" />
+              <NAvatar :size="36" round :src="agent.avatarUrl">
+                {{ (agent.name || 'AI')[0] }}
+              </NAvatar>
+              <div class="agent-info">
+                <span class="agent-name">{{ agent.name }}</span>
+                <span class="agent-desc">{{ agent.description || '' }}</span>
+              </div>
+              <div class="agent-tags">
+                <NTag v-for="tag in parseTags(agent.capabilityTags).slice(0, 2)" :key="tag" size="tiny" :bordered="false">
+                  {{ tag }}
+                </NTag>
+              </div>
             </div>
-            <div class="agent-tags">
-              <NTag v-for="tag in parseTags(agent.capabilityTags).slice(0, 2)" :key="tag" size="tiny" :bordered="false">
-                {{ tag }}
-              </NTag>
-            </div>
-          </div>
-        </NRadioGroup>
+          </NRadioGroup>
+        </div>
       </div>
 
       <!-- Group mode: multi-agent selection with checkboxes -->
@@ -112,7 +124,7 @@ function close() {
         <NButton @click="close">取消</NButton>
         <NButton
           type="primary"
-          :disabled="mode === 'direct' ? !selectedAgentId : selectedAgentIds.length < 2"
+          :disabled="mode === 'direct' ? (!selectedAgentId || !topic.trim()) : selectedAgentIds.length < 2"
           @click="handleCreate"
         >
           {{ mode === 'direct' ? '开始对话' : '创建群聊' }}
