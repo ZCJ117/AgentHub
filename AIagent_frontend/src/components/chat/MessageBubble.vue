@@ -369,6 +369,45 @@ watch(isStreaming, (newVal, oldVal) => {
   margin: 8px 0;
 }
 
+.markdown-body :deep(h2) {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1D1D1F;
+  margin: 20px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #E5E5EA;
+  line-height: 1.4;
+}
+
+.markdown-body :deep(ol) {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-body :deep(ol li) {
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+.markdown-body :deep(ul) {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-body :deep(ul li) {
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+.markdown-body :deep(p) {
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.markdown-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
 .msg-text :deep(.agent-mention) {
   background: #E8F0FE;
   color: #1A56DB;
