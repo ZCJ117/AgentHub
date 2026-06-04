@@ -15,6 +15,8 @@ import vip.mate.infra.channel.web.ChatStreamTracker;
 import vip.mate.domain.workspace.conversation.ConversationService;
 import vip.mate.domain.workspace.conversation.repository.MessageMapper;
 import vip.mate.domain.workspace.conversation.model.MessageEntity;
+import vip.mate.domain.message.service.MessagePinService;
+import vip.mate.domain.message.model.MessagePinEntity;
 import vip.mate.domain.workspace.core.repository.WorkspaceMapper;
 import vip.mate.domain.workspace.core.model.WorkspaceEntity;
 
@@ -44,6 +46,7 @@ public class AgentMentionDispatcher {
     private final LocalCliProcessManager processManager;
     private final ChatStreamTracker streamTracker;
     private final MessageMapper messageMapper;
+    private final MessagePinService messagePinService;
     private final WorkspaceMapper workspaceMapper;
     private final AgentMapper agentMapper;
     private final GroupOrchestratorService groupOrchestratorService;
