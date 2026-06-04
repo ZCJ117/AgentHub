@@ -14,6 +14,7 @@ import vip.mate.domain.agent.model.AgentEntity;
 import vip.mate.infra.channel.web.ChatStreamTracker;
 import vip.mate.domain.workspace.conversation.ConversationService;
 import vip.mate.domain.workspace.conversation.repository.MessageMapper;
+import vip.mate.domain.workspace.conversation.model.ConversationEntity;
 import vip.mate.domain.workspace.conversation.model.MessageEntity;
 import vip.mate.domain.message.service.MessagePinService;
 import vip.mate.domain.message.model.MessagePinEntity;
@@ -661,7 +662,11 @@ public class AgentMentionDispatcher {
 
             // ── 前置：已固定消息作为长期上下文 ──
             try {
-                List<MessagePinEntity> pins = messagePinService.listPins(Long.parseLong(conversationId));
+                Long conversationDbId = resolveConversationDbId(conversationId);
+                if (conversationDbId == null) {
+                    log.debug("[Dispatcher] Could not resolve DB ID for {}, skipping pinned messages", conversationId);
+                } else {
+                    List<MessagePinEntity> pins = messagePinService.listPins(conversationDbId);
                 if (pins != null && !pins.isEmpty()) {
                     int maxPins = Math.min(pins.size(), 10);
                     ctx.append("# 以下是长期上下文（已固定的关键消息）\n\n");
@@ -677,6 +682,7 @@ public class AgentMentionDispatcher {
                     }
                     ctx.append("\n---\n\n");
                 }
+                } // end else (conversationDbId != null)
             } catch (Exception e) {
                 log.warn("[Dispatcher] Failed to load pinned messages for {}: {}", conversationId, e.getMessage());
             }
@@ -721,6 +727,20 @@ public class AgentMentionDispatcher {
         } catch (Exception e) {
             log.warn("[Dispatcher] Failed to build conversation context: {}", e.getMessage());
             return task;
+        }
+    }
+
+    /**
+     * Resolve the database primary key from the business conversation ID.
+     * @return the Long DB ID, or null if not resolvable
+     */
+    private Long resolveConversationDbId(String conversationId) {
+        try {
+            var conv = conversationService.getByConversationId(conversationId);
+            return conv != null ? conv.getId() : null;
+        } catch (Exception e) {
+            log.warn("[Dispatcher] Failed to resolve DB ID for {}: {}", conversationId, e.getMessage());
+            return null;
         }
     }
 
