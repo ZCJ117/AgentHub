@@ -1,0 +1,20 @@
+find-skills	智能匹配与推荐适配的技能，是 AI 代理的"应用商店搜索框"，用于发现和安装其他 Skills	608.7k	npx skills add vercel-labs/find-skills
+bash	提供终端运维、脚本执行能力，让 AI 能在 Shell 环境中运行命令	418.6k	npx skills add vercel-labs/bash
+fs	处理文件读写、代码修改等操作，让 AI 能直接操作本地文件系统	389.2k	npx skills add vercel-labs/fs
+git	赋予 AI 代码版本管理能力，自动处理 Git 操作	356.8k	npx skills add vercel-labs/git
+search	支持联网进行全网实时搜索，帮助 AI 获取最新信息	321.5k	npx skills add vercel-labs/search
+url	实现网页解析与文档读取功能	298.7k	npx skills add vercel-labs/url
+code	辅助代码重构和错误纠正	276.3k	npx skills add vercel-labs/code
+terminal	支持长时间运行的终端命令	253.1k	npx skills add vercel-labs/terminal
+docker	提供容器部署与运维能力	223.8k	npx skills add vercel-labs/docker
+npm	管理前端项目依赖	198.5k	npx skills add vercel-labs/npm
+python	运行 Python 脚本和进行数据分析	187.2k	npx skills add vercel-labs/python
+markdown	优化文案、文档的排版与呈现	165.9k	npx skills add vercel-labs/markdown
+sql	执行数据库操作	143.6k	npx skills add vercel-labs/sql
+ssh	连接并运维远程服务器	128.7k	npx skills add vercel-labs/ssh
+curl	调试 API 接口	115.3k	npx skills add vercel-labs/curl
+task	执行批量自动化任务	102.8k	npx skills add vercel-labs/task
+zip	处理文件压缩与备份	98.5k	npx skills add vercel-labs/zip
+keyboard	实现桌面键鼠自动化操作	92.7k	npx skills add vercel-labs/keyboard
+clipboard	同步与读写系统剪贴板	87.3k	npx skills add vercel-labs/clipboard
+notes	进行本地笔记的整理与归档	82.1k	npx skills add vercel-labs/notes
