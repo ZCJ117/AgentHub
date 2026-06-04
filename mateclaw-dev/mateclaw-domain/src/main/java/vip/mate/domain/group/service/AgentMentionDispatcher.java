@@ -652,17 +652,43 @@ public class AgentMentionDispatcher {
     }
 
     /**
-     * Build a contextual message by prepending recent conversation history
-     * so the sub-agent has multi-turn context in group chat.
+     * Build a contextual message by prepending pinned messages and recent conversation
+     * history so the sub-agent has long-term context + multi-turn context in group chat.
      */
     private String buildContextMessage(String task, String conversationId) {
         try {
-            List<MessageEntity> history = conversationService.listRecentMessages(conversationId, 20);
-            if (history == null || history.isEmpty()) {
-                return task;
+            StringBuilder ctx = new StringBuilder();
+
+            // ── 前置：已固定消息作为长期上下文 ──
+            try {
+                List<MessagePinEntity> pins = messagePinService.listPins(Long.parseLong(conversationId));
+                if (pins != null && !pins.isEmpty()) {
+                    int maxPins = Math.min(pins.size(), 10);
+                    ctx.append("# 以下是长期上下文（已固定的关键消息）\n\n");
+                    for (int i = 0; i < maxPins; i++) {
+                        MessagePinEntity pin = pins.get(i);
+                        MessageEntity pinnedMsg = messageMapper.selectById(pin.getMessageId());
+                        if (pinnedMsg != null) {
+                            String content = conversationService.renderMessageContent(pinnedMsg);
+                            if (content != null && !content.isBlank()) {
+                                ctx.append("- ").append(content).append("\n");
+                            }
+                        }
+                    }
+                    ctx.append("\n---\n\n");
+                }
+            } catch (Exception e) {
+                log.warn("[Dispatcher] Failed to load pinned messages for {}: {}", conversationId, e.getMessage());
             }
 
-            StringBuilder ctx = new StringBuilder();
+            // ── 原有：对话历史 ──
+            List<MessageEntity> history = conversationService.listRecentMessages(conversationId, 20);
+            if (history == null || history.isEmpty()) {
+                ctx.append("# 当前任务\n");
+                ctx.append(task);
+                return ctx.toString();
+            }
+
             ctx.append("# 以下是群聊对话历史上下文\n\n");
             Map<Long, String> nameCache = new HashMap<>();
             for (MessageEntity msg : history) {
