@@ -667,22 +667,22 @@ public class AgentMentionDispatcher {
                     log.debug("[Dispatcher] Could not resolve DB ID for {}, skipping pinned messages", conversationId);
                 } else {
                     List<MessagePinEntity> pins = messagePinService.listPins(conversationDbId);
-                if (pins != null && !pins.isEmpty()) {
-                    int maxPins = Math.min(pins.size(), 10);
-                    ctx.append("# 以下是长期上下文（已固定的关键消息）\n\n");
-                    for (int i = 0; i < maxPins; i++) {
-                        MessagePinEntity pin = pins.get(i);
-                        MessageEntity pinnedMsg = messageMapper.selectById(pin.getMessageId());
-                        if (pinnedMsg != null) {
-                            String content = conversationService.renderMessageContent(pinnedMsg);
-                            if (content != null && !content.isBlank()) {
-                                ctx.append("- ").append(content).append("\n");
+                    if (pins != null && !pins.isEmpty()) {
+                        int maxPins = Math.min(pins.size(), 10);
+                        ctx.append("# 以下是长期上下文（已固定的关键消息）\n\n");
+                        for (int i = 0; i < maxPins; i++) {
+                            MessagePinEntity pin = pins.get(i);
+                            MessageEntity pinnedMsg = messageMapper.selectById(pin.getMessageId());
+                            if (pinnedMsg != null) {
+                                String content = conversationService.renderMessageContent(pinnedMsg);
+                                if (content != null && !content.isBlank()) {
+                                    ctx.append("- ").append(content).append("\n");
+                                }
                             }
                         }
+                        ctx.append("\n---\n\n");
                     }
-                    ctx.append("\n---\n\n");
                 }
-                } // end else (conversationDbId != null)
             } catch (Exception e) {
                 log.warn("[Dispatcher] Failed to load pinned messages for {}: {}", conversationId, e.getMessage());
             }
