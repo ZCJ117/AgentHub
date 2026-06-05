@@ -679,7 +679,7 @@ public class ChatController {
                 } else if (isGroupChat && agentNameMap != null && convDbId != null) {
                     // ── Group chat: use arther-agent Agent01 as Orchestrator ──
                     List<AgentEntity> memberAgents = new ArrayList<>(agentNameMap.values());
-                    String orchPrompt = groupOrchestratorService.buildOrchestratorPrompt(memberAgents, message);
+                    String orchPrompt = groupOrchestratorService.buildOrchestratorPrompt(memberAgents, promptText);
 
                     // Load conversation history so the orchestrator has multi-turn context
                     List<Map<String, String>> history = List.of();
