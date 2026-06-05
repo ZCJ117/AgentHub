@@ -7,7 +7,7 @@ import BrandMark from '@/components/common/BrandMark.vue'
 import UserPill from './UserPill.vue'
 import {
   BusinessOutline, ChevronDownOutline,
-  HardwareChipOutline, CubeOutline, BuildOutline, SettingsOutline,
+  HardwareChipOutline, BuildOutline, SettingsOutline,
   AddOutline, ChatbubbleOutline, PeopleOutline
 } from '@vicons/ionicons5'
 import { NButton, NDropdown, NIcon, NTooltip } from 'naive-ui'
@@ -21,7 +21,6 @@ const workspaceStore = useWorkspaceStore()
 
 const navItems = [
   { key: 'agents',    icon: HardwareChipOutline, tooltip: 'Agent', path: '/agents' },
-  { key: 'artifacts', icon: CubeOutline,         tooltip: '产物',  path: '/artifacts' },
   { key: 'skills',    icon: BuildOutline,        tooltip: '技能',  path: '/skills' },
   { key: 'settings',  icon: SettingsOutline,     tooltip: '设置',  path: '/settings' }
 ]
@@ -29,7 +28,6 @@ const navItems = [
 const activeKey = computed(() => {
   const name = route.name
   if (name === 'Agents' || name === 'AgentDetail') return 'agents'
-  if (name === 'Artifacts' || name === 'ArtifactDetail') return 'artifacts'
   if (name === 'Skills') return 'skills'
   if (name === 'Settings') return 'settings'
   return ''

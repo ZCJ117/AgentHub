@@ -91,7 +91,19 @@
       "WebFetch(domain:github.com)",
       "Bash(gh repo *)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('naive-ui:', p.dependencies['naive-ui']\\)\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('node_modules/naive-ui/es/avatar/src/Avatar.js', 'utf-8'\\); console.log\\(content.substring\\(0, 2000\\)\\)\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('node_modules/naive-ui/lib/avatar/src/Avatar.js', 'utf-8'\\); console.log\\(content.substring\\(0, 2000\\)\\)\")",
+      "Bash(xxd)",
+      "Bash(python3)",
+      "Bash(node *)",
+      "Bash(mv group/GroupConversationServiceTest.java /tmp/loom_test_backup/group/)",
+      "Bash(mkdir -p /tmp/loom_test_backup/group)",
+      "Bash(mv GroupConversationServiceTest.java /tmp/loom_test_backup/group/)",
+      "Bash(cp group/GroupConversationServiceTest.java /tmp/loom_test_backup/group/GroupConversationServiceTest.java)",
+      "Bash(rm -f group/GroupConversationServiceTest.java)",
+      "Bash(awk *)"
     ]
   }
 }

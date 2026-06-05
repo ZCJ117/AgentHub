@@ -2,16 +2,28 @@
 import { computed, inject } from 'vue'
 import { useConversationStore } from '@/stores/conversation'
 import { useOrchestratorStore } from '@/stores/orchestrator'
+import { useChatStore } from '@/stores/chat'
 import { NAvatar, NTag, NButton, NCollapse, NCollapseItem, NSpin, NSpace } from 'naive-ui'
 
 const convStore = useConversationStore()
 const orchStore = useOrchestratorStore()
+const chatStore = useChatStore()
 
 const emit = defineEmits(['unpinMessage'])
 const scrollToMessage = inject('scrollToMessage', null)
 
 const conversation = computed(() => convStore.activeConversation)
 const pinnedMessages = computed(() => convStore.pinnedMessages || [])
+
+const enrichedPins = computed(() =>
+  pinnedMessages.value.map(pin => {
+    const msg = chatStore.messages.find(m => m.id === pin.messageId)
+    return {
+      ...pin,
+      messagePreview: msg ? (msg.content || '').slice(0, 80) : ''
+    }
+  })
+)
 const isGroup = computed(() => conversation.value?.conversationType === 'group')
 const task = computed(() => orchStore.currentTask)
 const assignments = computed(() => orchStore.assignments)
@@ -57,7 +69,12 @@ function parseMemberTags(tags) {
         :key="member.agentId"
         class="member-item"
       >
-        <NAvatar :size="32" round :src="member.avatarUrl">
+        <NAvatar v-if="member.avatarUrl" :size="32" round :src="member.avatarUrl">
+          <template #fallback>
+            {{ (member.agentName || '?')[0] }}
+          </template>
+        </NAvatar>
+        <NAvatar v-else :size="32" round>
           {{ (member.agentName || '?')[0] }}
         </NAvatar>
         <div class="member-info">
@@ -72,16 +89,16 @@ function parseMemberTags(tags) {
       </div>
     </div>
 
-    <div class="panel-section" v-if="pinnedMessages.length > 0">
-      <h4>钉选消息 ({{ pinnedMessages.length }})</h4>
+    <div class="panel-section" v-if="enrichedPins.length > 0">
+      <h4>钉选消息 ({{ enrichedPins.length }})</h4>
       <div
-        v-for="pin in pinnedMessages"
+        v-for="pin in enrichedPins"
         :key="pin.id"
         class="pinned-item"
         @click="scrollToMessage?.(pin.messageId)"
       >
         <p class="pin-note">{{ pin.note || '(无备注)' }}</p>
-        <p class="pin-preview">{{ pin.messagePreview || '' }}</p>
+        <p class="pin-preview">{{ pin.messagePreview || '(无内容)' }}</p>
         <NButton
           size="tiny"
           text

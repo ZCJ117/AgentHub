@@ -490,13 +490,18 @@ public class ConversationService {
         message.setCompletionTokens(completionTokens);
         message.setRuntimeModel(runtimeModel);
         message.setRuntimeProvider(runtimeProvider);
-        message.setMetadata(metadata != null ? metadata : "{}");  // Initialize as empty JSON object / 初始化为空对象
+        message.setMetadata(metadata != null ? metadata : "{}");
+
+        // Resolve senderAgentId for direct chat assistant messages so history can display avatars
+        ConversationEntity conv = conversationMapper.selectOne(new LambdaQueryWrapper<ConversationEntity>()
+                .eq(ConversationEntity::getConversationId, conversationId));
+        if ("assistant".equals(role) && conv != null && "direct".equals(conv.getConversationType()) && conv.getAgentId() != null) {
+            message.setSenderAgentId(conv.getAgentId());
+        }
+
         messageMapper.insert(message);
 
         // Update aggregate counters on the parent conversation row.
-        // 更新会话信息（消息计数、最后活跃时间、最后一条摘要）。
-        ConversationEntity conv = conversationMapper.selectOne(new LambdaQueryWrapper<ConversationEntity>()
-                .eq(ConversationEntity::getConversationId, conversationId));
         if (conv != null) {
             conv.setMessageCount(conv.getMessageCount() + 1);
             conv.setLastActiveTime(LocalDateTime.now());

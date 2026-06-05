@@ -216,7 +216,12 @@ function closeMention() {
               @click="selectMember(member)"
             >
               <template #prefix>
-                <NAvatar :size="28" round :src="member.avatarUrl">
+                <NAvatar v-if="member.avatarUrl" :size="28" round :src="member.avatarUrl">
+                  <template #fallback>
+                    {{ (member.agentName || '?')[0] }}
+                  </template>
+                </NAvatar>
+                <NAvatar v-else :size="28" round>
                   {{ (member.agentName || '?')[0] }}
                 </NAvatar>
               </template>

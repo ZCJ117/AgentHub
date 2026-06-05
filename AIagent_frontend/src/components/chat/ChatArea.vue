@@ -89,7 +89,12 @@ watch(
 <template>
   <div class="chat-area">
     <div class="chat-header">
-      <NAvatar :size="38" round :src="headerAvatar" :fallback-src="undefined">
+      <NAvatar v-if="headerAvatar" :size="38" round :src="headerAvatar">
+        <template #fallback>
+          {{ (headerTitle || 'AI')[0] }}
+        </template>
+      </NAvatar>
+      <NAvatar v-else :size="38" round>
         {{ (headerTitle || 'AI')[0] }}
       </NAvatar>
       <div class="header-text">

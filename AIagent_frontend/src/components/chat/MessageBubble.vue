@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, watch, ref } from 'vue'
 import { renderMarkdown, highlightAgentMentions } from '@/composables/useMarkdown'
 import { NAvatar, NButton, NCode, NTag, NIcon, NImage } from 'naive-ui'
 import { PinOutline, Pin } from '@vicons/ionicons5'
@@ -10,6 +10,25 @@ import { useArtifactStore } from '@/stores/artifact'
 import { useChatStore } from '@/stores/chat'
 
 const EMOJI_MAP = { like: '👍', dislike: '👎', regenerate: '🔄', apply_diff: '✅' }
+
+const copiedBtn = ref(null)
+
+async function copyToClipboard(text, btnType) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    ta.style.position = 'fixed'
+    ta.style.opacity = '0'
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    document.body.removeChild(ta)
+  }
+  copiedBtn.value = btnType
+  setTimeout(() => { copiedBtn.value = null }, 2000)
+}
 
 const props = defineProps({
   message: { type: Object, required: true },
@@ -37,6 +56,7 @@ const emit = defineEmits([
 
 const isUser = computed(() => props.message.role === 'user')
 const isStreaming = computed(() => props.message.status === 'streaming')
+const isRegenerating = computed(() => props.message.status === 'regenerating')
 const isError = computed(() => props.message.status === 'error')
 const isWaiting = computed(() => props.message.status === 'waiting')
 const isReady = computed(() => props.message.status === 'ready')
@@ -128,8 +148,8 @@ watch(isStreaming, (newVal, oldVal) => {
 
       <div v-else-if="message.messageType === 'code'" class="msg-code">
         <NCode :code="codeContent" :language="codeLanguage" />
-        <NButton size="tiny" quaternary @click="navigator.clipboard?.writeText(codeContent)">
-          复制
+        <NButton size="tiny" quaternary @click="copyToClipboard(codeContent, 'code')">
+          {{ copiedBtn === 'code' ? '已复制' : '复制' }}
         </NButton>
       </div>
 
@@ -171,6 +191,7 @@ watch(isStreaming, (newVal, oldVal) => {
       </div>
 
       <div v-if="isStreaming" class="msg-status streaming">生成中...</div>
+      <div v-else-if="isRegenerating" class="msg-status streaming">重新生成中...</div>
       <div v-else-if="isError" class="msg-status error">生成失败</div>
       <div v-else-if="isWaiting" class="msg-status waiting">
         等待上游 {{ message.dependsOn || 'Agent' }} 完成...
@@ -195,9 +216,9 @@ watch(isStreaming, (newVal, oldVal) => {
       </div>
 
       <!-- Action buttons -->
-      <div v-if="!isUser && !isStreaming && !isError" class="msg-actions">
+      <div v-if="!isUser && !isStreaming && !isRegenerating && !isError" class="msg-actions">
         <NButton size="tiny" quaternary @click="emit('reply', props.message)">回复</NButton>
-        <NButton size="tiny" quaternary @click="navigator.clipboard?.writeText(message.content)">复制</NButton>
+        <NButton size="tiny" quaternary @click="copyToClipboard(message.content, 'text')">{{ copiedBtn === 'text' ? '已复制' : '复制' }}</NButton>
         <NButton size="tiny" quaternary @click="emit('regenerate', message.id)">重新生成</NButton>
         <NButton
           v-if="message.replyToId"

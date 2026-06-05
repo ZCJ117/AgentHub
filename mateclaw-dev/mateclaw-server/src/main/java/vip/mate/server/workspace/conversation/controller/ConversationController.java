@@ -6,15 +6,19 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import vip.mate.domain.agent.AgentService;
 import vip.mate.domain.agent.model.AgentEntity;
 import vip.mate.domain.agent.repository.AgentMapper;
+import vip.mate.domain.auth.service.AuthService;
 import vip.mate.common.result.R;
 import vip.mate.infra.channel.web.ChatStreamTracker;
 import vip.mate.domain.group.model.GroupMemberEntity;
 import vip.mate.domain.group.repository.GroupMemberMapper;
 import vip.mate.domain.workspace.conversation.ConversationService;
 import vip.mate.domain.workspace.conversation.model.ConversationEntity;
+import vip.mate.domain.workspace.conversation.model.MessageEntity;
 import vip.mate.domain.workspace.conversation.repository.ConversationMapper;
+import vip.mate.domain.workspace.conversation.repository.MessageMapper;
 import vip.mate.domain.message.model.MessagePinEntity;
 import vip.mate.domain.message.service.MessagePinService;
 import vip.mate.domain.message.service.MessageReactionService;
@@ -41,9 +45,12 @@ public class ConversationController {
     private final ChatStreamTracker streamTracker;
     private final MessageReactionService reactionService;
     private final MessagePinService pinService;
+    private final AuthService authService;
     private final ConversationMapper conversationMapper;
     private final AgentMapper agentMapper;
     private final GroupMemberMapper groupMemberMapper;
+    private final AgentService agentService;
+    private final MessageMapper messageMapper;
 
     /**
      * 获取当前用户的会话列表
@@ -405,7 +412,7 @@ public class ConversationController {
     public R<Void> addReaction(@PathVariable Long id,
                                 @RequestBody Map<String, String> body,
                                 Authentication auth) {
-        Long userId = auth != null ? Long.valueOf(auth.getName()) : 1L;
+        Long userId = auth != null ? authService.findByUsername(auth.getName()).getId() : 1L;
         reactionService.addReaction(id, userId, body.get("reactionType"));
         return R.ok();
     }
@@ -415,7 +422,7 @@ public class ConversationController {
     public R<Void> removeReaction(@PathVariable Long id,
                                    @PathVariable String reactionType,
                                    Authentication auth) {
-        Long userId = auth != null ? Long.valueOf(auth.getName()) : 1L;
+        Long userId = auth != null ? authService.findByUsername(auth.getName()).getId() : 1L;
         reactionService.removeReaction(id, userId, reactionType);
         return R.ok();
     }
@@ -447,7 +454,7 @@ public class ConversationController {
         if (convId == null) return R.fail(404, "会话不存在");
         Long messageId = Long.valueOf(body.get("messageId").toString());
         String note = (String) body.getOrDefault("note", null);
-        Long userId = auth != null ? Long.valueOf(auth.getName()) : 1L;
+        Long userId = auth != null ? authService.findByUsername(auth.getName()).getId() : 1L;
         pinService.pinMessage(messageId, convId, userId, note);
         return R.ok();
     }
@@ -475,11 +482,64 @@ public class ConversationController {
 
     @Operation(summary = "重新生成消息")
     @PostMapping("/messages/{id}/regenerate")
-    public R<Void> regenerateMessage(@PathVariable Long id,
-                                      @RequestBody(required = false) Map<String, String> body,
-                                      Authentication auth) {
-        // Trigger regenerate flow — stub for now, wired to existing regenerate mechanism
-        return R.ok();
+    public R<MessageVO> regenerateMessage(@PathVariable Long id,
+                                          @RequestBody(required = false) Map<String, String> body,
+                                          Authentication auth) {
+        String username = auth != null ? auth.getName() : "anonymous";
+
+        MessageEntity original = messageMapper.selectById(id);
+        if (original == null) {
+            return R.fail(404, "消息不存在");
+        }
+        if (!"assistant".equals(original.getRole())) {
+            return R.fail(400, "只能重新生成 AI 回复");
+        }
+
+        String conversationId = original.getConversationId();
+        if (!conversationService.isConversationOwner(conversationId, username)) {
+            return R.fail(403, "无权操作该会话");
+        }
+
+        // Find the latest user message before this assistant response
+        java.util.List<MessageEntity> history = conversationService.listMessages(conversationId);
+        String userPrompt = null;
+        for (int i = history.size() - 1; i >= 0; i--) {
+            MessageEntity m = history.get(i);
+            if (m.getCreateTime().isBefore(original.getCreateTime()) && "user".equals(m.getRole())) {
+                userPrompt = m.getContent();
+                break;
+            }
+        }
+        if (userPrompt == null) {
+            return R.fail(400, "找不到对应的用户消息");
+        }
+
+        // Get agent for this conversation
+        ConversationEntity conv = conversationMapper.selectOne(
+                new LambdaQueryWrapper<ConversationEntity>()
+                        .eq(ConversationEntity::getConversationId, conversationId));
+        if (conv == null || conv.getAgentId() == null) {
+            return R.fail(400, "会话或 Agent 不存在");
+        }
+
+        // Delete old assistant message and decrement count
+        messageMapper.deleteById(id);
+        if (conv.getMessageCount() != null && conv.getMessageCount() > 0) {
+            conv.setMessageCount(conv.getMessageCount() - 1);
+            conversationMapper.updateById(conv);
+        }
+
+        // Regenerate via agent
+        String newContent = agentService.chat(conv.getAgentId(), userPrompt, conversationId);
+
+        // Save new message and link back to original
+        MessageEntity newMsg = conversationService.saveMessage(conversationId, "assistant", newContent);
+        newMsg.setRegeneratedFromId(id);
+        messageMapper.updateById(newMsg);
+
+        return R.ok(MessageVO.from(newMsg,
+                conversationService.parseMessageParts(newMsg),
+                conversationService.renderMessageContent(newMsg)));
     }
 
     @Operation(summary = "获取回复链")

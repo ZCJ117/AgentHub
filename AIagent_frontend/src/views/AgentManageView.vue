@@ -65,7 +65,12 @@ function parseTags(tags) {
         <NGi v-for="agent in filteredAgents" :key="agent.id">
           <NCard hoverable @click="router.push(`/agents/${agent.id}`)" class="agent-card">
             <div class="agent-card-header">
-              <NAvatar :size="44" round :src="agent.avatarUrl">
+              <NAvatar v-if="agent.avatarUrl" :size="44" round :src="agent.avatarUrl">
+                <template #fallback>
+                  {{ (agent.name || 'AI')[0] }}
+                </template>
+              </NAvatar>
+              <NAvatar v-else :size="44" round>
                 {{ (agent.name || 'AI')[0] }}
               </NAvatar>
               <NBadge :color="statusColor(agent.agentStatus)" dot>

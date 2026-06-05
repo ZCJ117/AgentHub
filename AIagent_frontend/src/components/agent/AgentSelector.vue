@@ -79,7 +79,12 @@ function close() {
               :class="{ selected: selectedAgentId === agent.id }"
             >
               <NRadio :value="agent.id" />
-              <NAvatar :size="36" round :src="agent.avatarUrl">
+              <NAvatar v-if="agent.avatarUrl" :size="36" round :src="agent.avatarUrl">
+                <template #fallback>
+                  {{ (agent.name || 'AI')[0] }}
+                </template>
+              </NAvatar>
+              <NAvatar v-else :size="36" round>
                 {{ (agent.name || 'AI')[0] }}
               </NAvatar>
               <div class="agent-info">
@@ -109,7 +114,12 @@ function close() {
                 else selectedAgentIds = selectedAgentIds.filter(id => id !== agent.id)
               }"
             />
-            <NAvatar :size="28" round :src="agent.avatarUrl">
+            <NAvatar v-if="agent.avatarUrl" :size="28" round :src="agent.avatarUrl">
+              <template #fallback>
+                {{ (agent.name || 'AI')[0] }}
+              </template>
+            </NAvatar>
+            <NAvatar v-else :size="28" round>
               {{ (agent.name || 'AI')[0] }}
             </NAvatar>
             <span class="agent-name">{{ agent.name }}</span>

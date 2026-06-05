@@ -6,6 +6,7 @@ import { fetchMessages } from '@/api/conversations'
 import { addReaction, removeReaction, fetchReactions, regenerateMessage } from '@/api/messages'
 import { useAuthStore } from '@/stores/auth'
 import { useConversationStore } from '@/stores/conversation'
+import { useAgentStore } from '@/stores/agent'
 import { useSSE } from '@/composables/useSSE'
 import { useOrchestratorStore } from '@/stores/orchestrator'
 import { useArtifactStore } from '@/stores/artifact'
@@ -338,11 +339,19 @@ export const useChatStore = defineStore('chat', () => {
       if (data.conversationId) {
         conversationId.value = data.conversationId
       }
-      // Set orchestrator sender name for group chat messages
       const convStore = useConversationStore()
       const conv = convStore.activeConversation
       if (conv?.conversationType === 'group') {
         updateMessage(assistantId, { senderAgentName: '任务分配智能体' })
+      } else if (data.agentId) {
+        const agentStore = useAgentStore()
+        const agent = agentStore.agents.find(a => String(a.id) === String(data.agentId))
+        if (agent) {
+          updateMessage(assistantId, {
+            senderAgentName: agent.name,
+            senderAgentAvatarUrl: agent.avatarUrl || null
+          })
+        }
       }
     })
 
@@ -483,12 +492,14 @@ export const useChatStore = defineStore('chat', () => {
     const msg = messages.value.find(m => m.id === messageId)
     if (!msg) return
 
+    msg.status = 'regenerating'
     try {
       await regenerateMessage(messageId)
       if (conversationId.value) {
         await initConversation(conversationId.value)
       }
     } catch (err) {
+      msg.status = 'completed'
       console.warn('Regenerate failed:', err)
     }
   }

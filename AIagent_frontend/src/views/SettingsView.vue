@@ -1,26 +1,15 @@
 <script setup>
 import { ref, onMounted, watch, h } from 'vue'
-import { useAuthStore } from '@/stores/auth'
 import { useWorkspaceStore } from '@/stores/workspace'
 import { useRouter } from 'vue-router'
 import { NInput, NButton, NSpace, NCard, NModal, NForm, NFormItem, NDatePicker, NAlert, NPopconfirm, NDataTable, NEmpty } from 'naive-ui'
-import { updateProfile, changePassword } from '@/api/auth'
-import { fetchTokens, createToken, revokeToken } from '@/api/tokens'
 import { updateWorkspace } from '@/api/workspaces'
+import { fetchTokens, createToken, revokeToken } from '@/api/tokens'
 import { fetchDirs } from '@/api/filesystem'
 
 const router = useRouter()
-const authStore = useAuthStore()
 const workspaceStore = useWorkspaceStore()
 
-const nickname = ref('')
-const email = ref('')
-const oldPassword = ref('')
-const newPassword = ref('')
-const savingProfile = ref(false)
-const savingPassword = ref(false)
-const profileMsg = ref('')
-const passwordMsg = ref('')
 const basePath = ref('')
 const savingPath = ref(false)
 const pathMsg = ref('')
@@ -63,13 +52,10 @@ const tokenColumns = [
 ]
 
 onMounted(async () => {
-  await authStore.refreshProfile()
-  nickname.value = authStore.nickname || ''
   loadTokens()
   if (workspaceStore.activeId == null || workspaceStore.workspaces.length === 0) {
     await workspaceStore.loadAndSelect()
   }
-  // Read basePath directly from loaded data to avoid computed timing edge case
   const ws = workspaceStore.workspaces.find(w => w.id === workspaceStore.activeId)
   basePath.value = ws?.basePath || ''
 })
@@ -109,39 +95,6 @@ async function handleRevoke(id) {
     await loadTokens()
   } catch (err) {
     tokenMsg.value = err.message || '吊销失败'
-  }
-}
-
-async function saveProfile() {
-  savingProfile.value = true
-  profileMsg.value = ''
-  try {
-    await updateProfile({ nickname: nickname.value, email: email.value })
-    profileMsg.value = '个人信息已更新'
-    authStore.nickname = nickname.value
-  } catch (err) {
-    profileMsg.value = err.message || '更新失败'
-  } finally {
-    savingProfile.value = false
-  }
-}
-
-async function savePassword() {
-  if (!oldPassword.value || !newPassword.value) {
-    passwordMsg.value = '请填写新旧密码'
-    return
-  }
-  savingPassword.value = true
-  passwordMsg.value = ''
-  try {
-    await changePassword(authStore.userId, oldPassword.value, newPassword.value)
-    passwordMsg.value = '密码已修改'
-    oldPassword.value = ''
-    newPassword.value = ''
-  } catch (err) {
-    passwordMsg.value = err.message || '修改失败'
-  } finally {
-    savingPassword.value = false
   }
 }
 
@@ -228,34 +181,6 @@ function closeDirPicker() {
       <h2>用户设置</h2>
     </div>
 
-    <NCard title="个人信息" class="settings-card">
-      <NSpace vertical :size="12">
-        <div>
-          <label>用户名</label>
-          <NInput :value="authStore.username" disabled />
-        </div>
-        <div>
-          <label>昵称</label>
-          <NInput v-model:value="nickname" placeholder="昵称" />
-        </div>
-        <div>
-          <label>角色</label>
-          <NInput :value="authStore.role" disabled />
-        </div>
-        <NButton type="primary" @click="saveProfile" :loading="savingProfile">保存</NButton>
-        <span v-if="profileMsg" class="msg">{{ profileMsg }}</span>
-      </NSpace>
-    </NCard>
-
-    <NCard title="修改密码" class="settings-card">
-      <NSpace vertical :size="12">
-        <NInput v-model:value="oldPassword" type="password" placeholder="当前密码" />
-        <NInput v-model:value="newPassword" type="password" placeholder="新密码" />
-        <NButton @click="savePassword" :loading="savingPassword">修改密码</NButton>
-        <span v-if="passwordMsg" class="msg">{{ passwordMsg }}</span>
-      </NSpace>
-    </NCard>
-
     <NCard title="工作区" class="settings-card">
       <NSpace vertical :size="12">
         <div>
@@ -275,10 +200,6 @@ function closeDirPicker() {
         <NButton type="primary" @click="saveBasePath" :loading="savingPath">保存</NButton>
         <span v-if="pathMsg" :style="{ fontSize: '13px', color: pathOk ? '#34C759' : '#FF3B30' }">{{ pathMsg }}</span>
       </NSpace>
-    </NCard>
-
-    <NCard title="关于" class="settings-card">
-      <p>AgentHub 多 Agent 协同工作平台 v1.0</p>
     </NCard>
 
     <NCard title="本地 Agent 接入" size="small" style="margin-top:16px">
