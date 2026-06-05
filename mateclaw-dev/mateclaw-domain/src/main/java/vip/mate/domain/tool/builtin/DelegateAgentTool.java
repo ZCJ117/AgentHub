@@ -890,11 +890,16 @@ public class DelegateAgentTool {
             ChatOrigin childOrigin = (parentOrigin != null ? parentOrigin : ChatOrigin.EMPTY)
                     .withAgent(target.getId())
                     .withConversationId(childConversationId);
-            String rawResult = agentService.chat(target.getId(), task, childConversationId, childOrigin);
-            long durationMs = System.currentTimeMillis() - startTime;
-            // Measure lengths before truncation so ChildResult carries accurate metadata.
-            return ChildResult.ofSuccess(taskIndex, target.getName(), rawResult, durationMs,
-                    MAX_RESULT_LENGTH);
+            ToolExecutionContext.setParentConversationId(parentConversationId);
+            try {
+                String rawResult = agentService.chat(target.getId(), task, childConversationId, childOrigin);
+                long durationMs = System.currentTimeMillis() - startTime;
+                // Measure lengths before truncation so ChildResult carries accurate metadata.
+                return ChildResult.ofSuccess(taskIndex, target.getName(), rawResult, durationMs,
+                        MAX_RESULT_LENGTH);
+            } finally {
+                ToolExecutionContext.clearParentConversationId();
+            }
         } catch (Exception e) {
             log.error("Child agent failed: taskIndex={}, agent={}, error={}",
                     taskIndex, target.getName(), e.getMessage());

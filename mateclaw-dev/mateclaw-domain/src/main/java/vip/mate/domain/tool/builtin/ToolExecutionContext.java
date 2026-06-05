@@ -24,6 +24,7 @@ public final class ToolExecutionContext {
     private static final ThreadLocal<String> USERNAME = new ThreadLocal<>();
     /** 工作区活动目录（为空不限制） */
     private static final ThreadLocal<String> WORKSPACE_BASE_PATH = new ThreadLocal<>();
+    private static final ThreadLocal<String> PARENT_CONVERSATION_ID = new ThreadLocal<>();
 
     private ToolExecutionContext() {}
 
@@ -52,10 +53,15 @@ public final class ToolExecutionContext {
         return WORKSPACE_BASE_PATH.get();
     }
 
+    public static void setParentConversationId(String id) { PARENT_CONVERSATION_ID.set(id); }
+    public static String parentConversationId() { return PARENT_CONVERSATION_ID.get(); }
+    public static void clearParentConversationId() { PARENT_CONVERSATION_ID.remove(); }
+
     public static void clear() {
         CONVERSATION_ID.remove();
         USERNAME.remove();
         WORKSPACE_BASE_PATH.remove();
+        PARENT_CONVERSATION_ID.remove();
     }
 
     // ===== RFC-063r §2.5: ToolContext-aware accessors =====

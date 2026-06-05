@@ -35,6 +35,11 @@ final class ChatUploadResolver {
         if (rawPath == null || rawPath.isBlank()) {
             return null;
         }
+        // 绝对路径：直接检查文件是否存在
+        Path absPath = Paths.get(rawPath).toAbsolutePath().normalize();
+        if (absPath.isAbsolute() && Files.isRegularFile(absPath)) {
+            return absPath;
+        }
         String conversationId = ToolExecutionContext.conversationId();
         if (conversationId == null || conversationId.isBlank()) {
             return null;
@@ -64,15 +69,40 @@ final class ChatUploadResolver {
         // characters with underscores; match by sanitized basename suffix.
         String safeBasename = basename.replaceAll("[^a-zA-Z0-9._-]", "_");
         String suffix = "_" + safeBasename;
+        Path matched = null;
         try (var stream = Files.list(uploadDir)) {
-            return stream
+            matched = stream
                     .filter(Files::isRegularFile)
                     .filter(p -> p.getFileName().toString().endsWith(suffix))
                     .findFirst()
                     .orElse(null);
         } catch (IOException e) {
             log.warn("[ChatUploadResolver] Failed to scan chat-upload dir {}: {}", uploadDir, e.getMessage());
-            return null;
         }
+        if (matched != null) {
+            return matched;
+        }
+
+        // 父对话 fallback
+        String parentConvId = ToolExecutionContext.parentConversationId();
+        if (parentConvId != null && !parentConvId.isBlank()) {
+            Path parentDir = CHAT_UPLOAD_ROOT.resolve(parentConvId).toAbsolutePath().normalize();
+            if (Files.isDirectory(parentDir)) {
+                Path parentDirect = parentDir.resolve(basename);
+                if (Files.isRegularFile(parentDirect)) {
+                    return parentDirect;
+                }
+                try (var parentStream = Files.list(parentDir)) {
+                    return parentStream
+                            .filter(Files::isRegularFile)
+                            .filter(p -> p.getFileName().toString().endsWith(suffix))
+                            .findFirst()
+                            .orElse(null);
+                } catch (IOException e) {
+                    log.warn("[ChatUploadResolver] Failed to scan parent upload dir {}: {}", parentDir, e.getMessage());
+                }
+            }
+        }
+        return null;
     }
 }
