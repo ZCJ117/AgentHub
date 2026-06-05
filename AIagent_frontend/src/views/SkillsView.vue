@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { NTabs, NTabPane, NButton, NTag, NModal, NSpin, NIcon, NCard, useMessage } from 'naive-ui'
+import { NTabs, NTabPane, NButton, NTag, NModal, NSpin, NIcon, NCard, NMessageProvider, useMessage } from 'naive-ui'
 import { CopyOutline } from '@vicons/ionicons5'
 import { scanGlobalSkills } from '@/api/skills'
 
@@ -52,8 +52,9 @@ function copyCommand() {
 </script>
 
 <template>
-  <div class="skills-page">
-    <NCard>
+  <NMessageProvider>
+    <div class="skills-page">
+      <NCard>
       <div class="skills-header">
         <h2>🔧 全局技能管理</h2>
         <p class="subtitle">管理 Claude Code 和 OpenCode 的全局 Skills</p>
@@ -125,7 +126,8 @@ function copyCommand() {
         </NButton>
       </div>
     </NModal>
-  </div>
+    </div>
+  </NMessageProvider>
 </template>
 
 <style scoped>
