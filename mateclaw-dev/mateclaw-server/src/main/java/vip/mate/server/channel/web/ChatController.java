@@ -1777,9 +1777,18 @@ public class ChatController {
             }
             switch (part.getType()) {
                 case "text", "thinking" -> appendPromptLine(builder, part.getText());
-                case "file" -> appendPromptLine(builder, "附件: " + safe(part.getFileName()) + " (" + safe(part.getPath()) + ")");
-                case "image" -> appendPromptLine(builder, "图片附件: " + safe(part.getFileName()) + " (" + safe(part.getPath()) + ")");
-                case "video" -> appendPromptLine(builder, "视频附件: " + safe(part.getFileName()) + " (" + safe(part.getPath()) + ")");
+                case "file" -> {
+                    Path abs = part.getPath() != null ? Paths.get(part.getPath()).toAbsolutePath().normalize() : null;
+                    appendPromptLine(builder, "附件: " + safe(part.getFileName()) + " (" + safe(abs != null ? abs.toString() : part.getPath()) + ")");
+                }
+                case "image" -> {
+                    Path abs = part.getPath() != null ? Paths.get(part.getPath()).toAbsolutePath().normalize() : null;
+                    appendPromptLine(builder, "图片附件: " + safe(part.getFileName()) + " (" + safe(abs != null ? abs.toString() : part.getPath()) + ")");
+                }
+                case "video" -> {
+                    Path abs = part.getPath() != null ? Paths.get(part.getPath()).toAbsolutePath().normalize() : null;
+                    appendPromptLine(builder, "视频附件: " + safe(part.getFileName()) + " (" + safe(abs != null ? abs.toString() : part.getPath()) + ")");
+                }
                 default -> appendPromptLine(builder, part.getText());
             }
         }
