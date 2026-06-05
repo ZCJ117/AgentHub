@@ -35,9 +35,10 @@ final class ChatUploadResolver {
         if (rawPath == null || rawPath.isBlank()) {
             return null;
         }
-        // 绝对路径：直接检查文件是否存在
+        // 绝对路径：检查是否在 chat-uploads 目录下且文件存在
         Path absPath = Paths.get(rawPath).toAbsolutePath().normalize();
-        if (absPath.isAbsolute() && Files.isRegularFile(absPath)) {
+        Path uploadRoot = CHAT_UPLOAD_ROOT.toAbsolutePath().normalize();
+        if (absPath.isAbsolute() && absPath.startsWith(uploadRoot) && Files.isRegularFile(absPath)) {
             return absPath;
         }
         String conversationId = ToolExecutionContext.conversationId();
