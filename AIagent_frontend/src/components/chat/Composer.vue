@@ -1,6 +1,6 @@
 <script setup>
 import { ref, watch, computed, nextTick } from 'vue'
-import { NButton, NPopover, NList, NListItem, NAvatar } from 'naive-ui'
+import { NButton, NPopover, NList, NListItem, NAvatar, useMessage } from 'naive-ui'
 import { useConversationStore } from '@/stores/conversation'
 import { useChatStore } from '@/stores/chat'
 import { useTextareaAutosize } from '@/composables/useTextareaAutosize'
@@ -18,6 +18,82 @@ const convStore = useConversationStore()
 const chatStore = useChatStore()
 const text = ref('')
 const { textarea, onInput: autosizeOnInput } = useTextareaAutosize()
+const message = useMessage()
+
+// ── 文件上传状态 ──
+const SUPPORTED_TYPES = [
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'text/markdown',
+  'text/x-markdown'
+]
+const MAX_FILE_SIZE = 10 * 1024 * 1024
+const MAX_FILE_COUNT = 5
+
+const pendingFiles = ref([])
+const isDragging = ref(false)
+const uploadErrors = ref(new Map())
+let fileIdCounter = 0
+
+function acceptFile(file) {
+  if (!SUPPORTED_TYPES.includes(file.type) && !file.name.match(/\.(md|txt)$/i)) {
+    message.warning(`不支持的文件类型: ${file.name}`)
+    return false
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    message.warning(`${file.name} 超过 10MB 限制`)
+    return false
+  }
+  return true
+}
+
+function addFiles(files) {
+  const remaining = MAX_FILE_COUNT - pendingFiles.value.length
+  if (remaining <= 0) {
+    message.warning(`最多上传 ${MAX_FILE_COUNT} 个文件`)
+    return
+  }
+  const toAdd = []
+  for (const f of files) {
+    if (toAdd.length >= remaining) {
+      message.warning(`最多上传 ${MAX_FILE_COUNT} 个文件，已截断`)
+      break
+    }
+    if (acceptFile(f)) {
+      toAdd.push({ id: ++fileIdCounter, name: f.name, size: f.size, type: f.type, file: f })
+    }
+  }
+  pendingFiles.value = [...pendingFiles.value, ...toAdd]
+}
+
+function removeFile(id) {
+  pendingFiles.value = pendingFiles.value.filter(f => f.id !== id)
+  uploadErrors.value.delete(id)
+}
+
+function handleFileInput(e) {
+  if (e.target.files?.length) addFiles(e.target.files)
+  e.target.value = ''
+}
+
+function onDragOver(e) {
+  e.preventDefault()
+  isDragging.value = true
+}
+
+function onDragLeave() {
+  isDragging.value = false
+}
+
+function onDrop(e) {
+  e.preventDefault()
+  isDragging.value = false
+  if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files)
+}
+// ── 文件上传状态结束 ──
 
 // @mention state
 const mentionOpen = ref(false)
@@ -152,12 +228,20 @@ function handleKeydown(e) {
   }
 }
 
-function handleSend() {
+async function handleSend() {
   const val = text.value.trim()
   if (!val || props.disabled) return
-  emit('send', val)
+  if (pendingFiles.value.length === 0) {
+    emit('send', val)
+    chatStore.clearReplyTo()
+    text.value = ''
+    return
+  }
+  emit('send', val, pendingFiles.value.map(f => f.file))
   chatStore.clearReplyTo()
   text.value = ''
+  pendingFiles.value = []
+  uploadErrors.value.clear()
 }
 
 function handleInterrupt() {
@@ -171,15 +255,47 @@ function closeMention() {
     mentionQuery.value = ''
   }, 150)
 }
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + 'B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + 'KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + 'MB'
+}
+
+function onPaste(e) {
+  // 暂不处理粘贴文件
+}
 </script>
 
 <template>
-  <div class="composer">
+  <div
+    class="composer"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
+    <div v-if="isDragging" class="drop-overlay">
+      <div class="drop-hint">释放以上传文件</div>
+    </div>
     <div class="composer-inner">
       <div v-if="chatStore.replyTo" class="reply-indicator">
         <span class="reply-indicator-text">正在回复 <strong>{{ chatStore.replyTo.senderName }}</strong>：{{ chatStore.replyTo.preview }}</span>
         <NButton text size="tiny" @click="chatStore.clearReplyTo()">✕ 取消</NButton>
       </div>
+
+      <div v-if="pendingFiles.length > 0" class="file-tags">
+        <span
+          v-for="f in pendingFiles"
+          :key="f.id"
+          class="file-tag"
+          :class="{ 'file-tag-error': uploadErrors.has(f.id) }"
+        >
+          📄 {{ f.name }}
+          <span class="file-tag-size">{{ formatSize(f.size) }}</span>
+          <span class="file-tag-remove" @click="removeFile(f.id)">✕</span>
+        </span>
+      </div>
+
       <NPopover
         :show="mentionOpen"
         trigger="manual"
@@ -198,6 +314,7 @@ function closeMention() {
             @input="onInput"
             @keydown="handleKeydown"
             @blur="closeMention"
+            @paste="onPaste"
           />
         </template>
         <div class="mention-popover">
@@ -232,6 +349,17 @@ function closeMention() {
         </div>
       </NPopover>
 
+      <NButton text class="attach-btn" @click="$refs.fileInput.click()" title="添加文件">
+        📎
+      </NButton>
+      <input
+        ref="fileInput"
+        type="file"
+        multiple
+        style="display:none"
+        @change="handleFileInput"
+      />
+
       <NButton
         v-if="isStreaming"
         type="warning"
@@ -264,6 +392,7 @@ function closeMention() {
 
 <style scoped>
 .composer {
+  position: relative;
   padding: 16px;
   background: #FFFFFF;
   border-top: 1px solid #E5E5EA;
@@ -347,5 +476,67 @@ function closeMention() {
 
 .mention-item-active {
   background: rgba(46, 117, 182, 0.1);
+}
+
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(46, 117, 182, 0.08);
+  border: 2px dashed #2E75B6;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+}
+.drop-hint {
+  font-size: 16px;
+  color: #2E75B6;
+  font-weight: 500;
+}
+.file-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  margin-bottom: 6px;
+}
+.file-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #F0F4FF;
+  border: 1px solid #C4D7FF;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: #333;
+}
+.file-tag-error {
+  background: #FFF3F0;
+  border-color: #FFC4B8;
+  color: #E74C3C;
+}
+.file-tag-size {
+  color: #999;
+  font-size: 11px;
+}
+.file-tag-remove {
+  cursor: pointer;
+  color: #999;
+  margin-left: 2px;
+}
+.file-tag-remove:hover {
+  color: #E74C3C;
+}
+.attach-btn {
+  font-size: 18px;
+  color: #999;
+  padding: 4px 8px;
+  flex-shrink: 0;
+}
+.attach-btn:hover {
+  color: #2E75B6;
 }
 </style>
