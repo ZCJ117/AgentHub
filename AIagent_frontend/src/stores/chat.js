@@ -194,7 +194,11 @@ export const useChatStore = defineStore('chat', () => {
     // ── 文件上传结束 ──
 
     streamError.value = ''
-    addMessageLocal('user', text, { replyToId: replyTo.value?.id || null })
+    let userContent = text
+    if (contentParts && contentParts.length > 0) {
+      userContent = text + '\n\n' + contentParts.map(p => p.fileName).join('\n')
+    }
+    addMessageLocal('user', userContent, { replyToId: replyTo.value?.id || null })
 
     const assistantId = addMessageLocal('assistant', '', { status: 'streaming' })
 
