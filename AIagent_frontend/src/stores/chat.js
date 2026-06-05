@@ -182,7 +182,10 @@ export const useChatStore = defineStore('chat', () => {
           })
         } catch (err) {
           console.warn('[chatStore] File upload failed:', file.name, err)
-          streamError.value = `文件 ${file.name} 上传失败: ${err.message}`
+          addMessageLocal('user', text, { replyToId: replyTo.value?.id || null })
+          const errorId = addMessageLocal('assistant', '', { status: 'error' })
+          updateMessage(errorId, { content: `文件上传失败: ${file.name} — ${err.message}` })
+          streamError.value = `文件 ${file.name} 上传失败`
           return
         }
       }
@@ -467,12 +470,13 @@ export const useChatStore = defineStore('chat', () => {
       }
     })
 
+    const { files: _f, contentParts: _cp, ...restOptions } = options || {}
     sse.connect((signal) => streamChat({
       agentId,
       message: text,
       conversationId: conversationId.value || null,
       contentParts: contentParts,
-      ...options
+      ...restOptions
     }, signal))
   }
 
