@@ -103,7 +103,8 @@
       "Bash(mv GroupConversationServiceTest.java /tmp/loom_test_backup/group/)",
       "Bash(cp group/GroupConversationServiceTest.java /tmp/loom_test_backup/group/GroupConversationServiceTest.java)",
       "Bash(rm -f group/GroupConversationServiceTest.java)",
-      "Bash(awk *)"
+      "Bash(awk *)",
+      "Bash(mvn spring-boot:run -pl mateclaw-server)"
     ]
   }
 }
