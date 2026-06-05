@@ -1,8 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { NTabs, NTabPane, NButton, NTag, NModal, NSpin, NIcon, NCard } from 'naive-ui'
 import { CopyOutline } from '@vicons/ionicons5'
 import { scanGlobalSkills } from '@/api/skills'
+
+const router = useRouter()
 
 const activeTab = ref('claude_code')
 const loading = ref(false)
@@ -54,6 +57,7 @@ function copyCommand() {
 
 <template>
   <div class="skills-page">
+    <NButton text @click="router.push('/chat')" class="back-btn">← 返回主页</NButton>
     <NCard>
       <div class="skills-header">
         <h2>🔧 全局技能管理</h2>
@@ -135,6 +139,10 @@ function copyCommand() {
   max-width: 960px;
   margin: 24px auto;
   padding: 0 16px;
+}
+.back-btn {
+  margin-bottom: 12px;
+  font-size: 15px;
 }
 .skills-header {
   text-align: center;
