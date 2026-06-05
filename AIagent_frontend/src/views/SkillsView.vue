@@ -114,7 +114,7 @@ function copyCommand() {
     </NCard>
 
     <!-- 安装命令 Modal -->
-    <NModal v-model:show="installModal" preset="card" title="安装 Skill">
+    <NModal v-model:show="installModal" preset="card" title="安装 Skill" style="max-width: 420px">
       <div v-if="installTarget" class="install-modal">
         <p>请在终端中执行以下命令：</p>
         <div class="command-block">
@@ -185,7 +185,7 @@ function copyCommand() {
   color: #999;
 }
 .install-modal {
-  padding: 12px;
+  padding: 0;
 }
 .install-modal p {
   margin: 0 0 8px;
