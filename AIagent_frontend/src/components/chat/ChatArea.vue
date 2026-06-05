@@ -135,7 +135,7 @@ watch(
       :is-streaming="isStreaming"
       :prefill-text="prefillText"
       :placeholder="conversation ? '输入消息...' : '选择一个 Agent 开始对话...'"
-      @send="emit('send', $event)"
+      @send="(text, files) => emit('send', text, files)"
       @stop="emit('stop')"
       @interrupt="emit('interrupt')"
     />

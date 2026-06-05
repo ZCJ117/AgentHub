@@ -37,6 +37,7 @@ const pendingFiles = ref([])
 const isDragging = ref(false)
 const uploadErrors = ref(new Map())
 let fileIdCounter = 0
+let dragCounter = 0
 
 function acceptFile(file) {
   if (!SUPPORTED_TYPES.includes(file.type) && !file.name.match(/\.(md|txt)$/i)) {
@@ -81,15 +82,25 @@ function handleFileInput(e) {
 
 function onDragOver(e) {
   e.preventDefault()
+}
+
+function onDragEnter(e) {
+  e.preventDefault()
+  dragCounter++
   isDragging.value = true
 }
 
-function onDragLeave() {
-  isDragging.value = false
+function onDragLeave(e) {
+  dragCounter--
+  if (dragCounter <= 0) {
+    dragCounter = 0
+    isDragging.value = false
+  }
 }
 
 function onDrop(e) {
   e.preventDefault()
+  dragCounter = 0
   isDragging.value = false
   if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files)
 }
@@ -228,7 +239,7 @@ function handleKeydown(e) {
   }
 }
 
-async function handleSend() {
+function handleSend() {
   const val = text.value.trim()
   if (!val || props.disabled) return
   if (pendingFiles.value.length === 0) {
@@ -271,6 +282,7 @@ function onPaste(e) {
   <div
     class="composer"
     @dragover="onDragOver"
+    @dragenter="onDragEnter"
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
@@ -356,6 +368,7 @@ function onPaste(e) {
         ref="fileInput"
         type="file"
         multiple
+        :accept="SUPPORTED_TYPES.join(',')"
         style="display:none"
         @change="handleFileInput"
       />
