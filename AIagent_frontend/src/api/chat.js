@@ -32,17 +32,19 @@ export function continueDag(conversationId, agentName) {
 }
 
 export function uploadFile(conversationIdOrNull, file) {
-  const wsId = localStorage.getItem('ai_agent_workspace_id') || ''
+  const wsId = localStorage.getItem('ai_agent_workspace_id')
   const token = getToken()
   const formData = new FormData()
   formData.append('file', file)
   const convId = conversationIdOrNull || 'default'
+
+  const headers = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (wsId) headers['X-Workspace-Id'] = wsId
+
   return fetch(`${BASE}/api/v1/chat/upload?conversationId=${encodeURIComponent(convId)}`, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'X-Workspace-Id': wsId
-    },
+    headers,
     body: formData
   }).then(res => {
     if (!res.ok) throw new Error(`Upload failed: ${res.status}`)
