@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { NTabs, NTabPane, NButton, NTag, NModal, NSpin, NIcon, NCard } from 'naive-ui'
+import { NTabs, NTabPane, NButton, NTag, NModal, NSpin, NIcon, NCard, useMessage } from 'naive-ui'
 import { CopyOutline } from '@vicons/ionicons5'
 import { scanGlobalSkills } from '@/api/skills'
 
@@ -12,6 +12,7 @@ const scanned = ref(false)
 
 const installModal = ref(false)
 const installTarget = ref(null)
+const message = useMessage()
 
 const scanPaths = {
   claude_code: '~/.claude/skills/',
@@ -45,6 +46,7 @@ function openInstall(skill) {
 function copyCommand() {
   if (installTarget.value) {
     navigator.clipboard.writeText(installTarget.value.installCommand)
+    message.success('命令已复制到剪贴板')
   }
 }
 </script>
@@ -111,7 +113,7 @@ function copyCommand() {
     </NCard>
 
     <!-- 安装命令 Modal -->
-    <NModal v-model:show="installModal" title="安装 Skill">
+    <NModal v-model:show="installModal" preset="card" title="安装 Skill">
       <div v-if="installTarget" class="install-modal">
         <p>请在终端中执行以下命令：</p>
         <div class="command-block">
