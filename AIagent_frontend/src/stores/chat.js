@@ -163,6 +163,33 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
 
+    // ── 文件上传 ──
+    const uploadFiles = options.files
+    let contentParts = options.contentParts || null
+    if (uploadFiles && uploadFiles.length > 0) {
+      const { uploadFile } = await import('@/api/chat')
+      const uploaded = []
+      for (const file of uploadFiles) {
+        try {
+          const data = await uploadFile(conversationId.value || 'default', file)
+          uploaded.push({
+            type: 'file',
+            fileName: data.fileName,
+            storedName: data.storedName,
+            path: data.path,
+            contentType: data.contentType,
+            fileSize: data.size
+          })
+        } catch (err) {
+          console.warn('[chatStore] File upload failed:', file.name, err)
+          streamError.value = `文件 ${file.name} 上传失败: ${err.message}`
+          return
+        }
+      }
+      contentParts = uploaded
+    }
+    // ── 文件上传结束 ──
+
     streamError.value = ''
     addMessageLocal('user', text, { replyToId: replyTo.value?.id || null })
 
@@ -444,6 +471,7 @@ export const useChatStore = defineStore('chat', () => {
       agentId,
       message: text,
       conversationId: conversationId.value || null,
+      contentParts: contentParts,
       ...options
     }, signal))
   }
