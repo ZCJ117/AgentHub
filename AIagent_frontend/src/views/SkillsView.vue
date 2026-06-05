@@ -1,12 +1,13 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { NTabs, NTabPane, NButton, NTag, NModal, NSpin, NIcon, NCard } from 'naive-ui'
 import { CopyOutline } from '@vicons/ionicons5'
 import { scanGlobalSkills } from '@/api/skills'
 
 const activeTab = ref('claude_code')
 const loading = ref(false)
-const skills = ref([])
+const claudeSkills = ref([])
+const opencodeSkills = ref([])
 const scanned = ref(false)
 
 const installModal = ref(false)
@@ -17,11 +18,19 @@ const scanPaths = {
   opencode: '~/.config/opencode/skills/'
 }
 
+const skills = computed(() => {
+  return activeTab.value === 'opencode' ? opencodeSkills.value : claudeSkills.value
+})
+
 async function handleScan() {
   loading.value = true
   try {
-    const res = await scanGlobalSkills(activeTab.value)
-    skills.value = res.data
+    const [claudeRes, openRes] = await Promise.all([
+      scanGlobalSkills('claude_code'),
+      scanGlobalSkills('opencode')
+    ])
+    claudeSkills.value = Array.isArray(claudeRes) ? claudeRes : (claudeRes?.records || [])
+    opencodeSkills.value = Array.isArray(openRes) ? openRes : (openRes?.records || [])
     scanned.value = true
   } finally {
     loading.value = false
@@ -57,7 +66,8 @@ function copyCommand() {
         <NButton type="primary" :loading="loading" @click="handleScan" size="large">
           🔍 扫描全局 Skills
         </NButton>
-        <p class="scan-path">扫描目录: {{ scanPaths[activeTab] }}</p>
+        <p class="scan-path">扫描目录: {{ scanPaths.claude_code }}</p>
+        <p class="scan-path">　　　　　{{ scanPaths.opencode }}</p>
       </div>
 
       <NSpin :show="loading">
