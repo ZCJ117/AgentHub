@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { NTabs, NTabPane, NButton, NTag, NModal, NSpin, NIcon, NCard, NMessageProvider, useMessage } from 'naive-ui'
+import { NTabs, NTabPane, NButton, NTag, NModal, NSpin, NIcon, NCard } from 'naive-ui'
 import { CopyOutline } from '@vicons/ionicons5'
 import { scanGlobalSkills } from '@/api/skills'
 
@@ -12,7 +12,7 @@ const scanned = ref(false)
 
 const installModal = ref(false)
 const installTarget = ref(null)
-const message = useMessage()
+const copied = ref(false)
 
 const scanPaths = {
   claude_code: '~/.claude/skills/',
@@ -46,15 +46,15 @@ function openInstall(skill) {
 function copyCommand() {
   if (installTarget.value) {
     navigator.clipboard.writeText(installTarget.value.installCommand)
-    message.success('命令已复制到剪贴板')
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000)
   }
 }
 </script>
 
 <template>
-  <NMessageProvider>
-    <div class="skills-page">
-      <NCard>
+  <div class="skills-page">
+    <NCard>
       <div class="skills-header">
         <h2>🔧 全局技能管理</h2>
         <p class="subtitle">管理 Claude Code 和 OpenCode 的全局 Skills</p>
@@ -124,10 +124,10 @@ function copyCommand() {
           <template #icon><NIcon :component="CopyOutline" /></template>
           复制命令
         </NButton>
+        <span v-if="copied" class="copied-hint">✓ 已复制到剪贴板</span>
       </div>
     </NModal>
-    </div>
-  </NMessageProvider>
+  </div>
 </template>
 
 <style scoped>
@@ -198,5 +198,10 @@ function copyCommand() {
   font-family: monospace;
   font-size: 14px;
   margin-bottom: 12px;
+}
+.copied-hint {
+  color: #18a058;
+  font-size: 13px;
+  margin-left: 12px;
 }
 </style>
