@@ -1,8 +1,10 @@
 package vip.mate.infra.agent.bridge;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
+import vip.mate.domain.workspace.conversation.model.MessageContentPart;
 import vip.mate.domain.agent.AgentService;
 import vip.mate.domain.agent.AgentState;
 import vip.mate.domain.agent.BaseAgent;
@@ -181,6 +183,37 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
             }
 
             StringBuilder ctx = new StringBuilder();
+            // ── 新增: 提取用户上传的文件列表 ──
+            ObjectMapper objectMapper = new ObjectMapper();
+            List<MessageEntity> fileMessages = conversationService.listRecentMessages(conversationId, 50);
+            List<String> fileLines = new ArrayList<>();
+            for (MessageEntity msg : fileMessages) {
+                if ("user".equals(msg.getRole()) && msg.getContentParts() != null) {
+                    try {
+                        List<MessageContentPart> parts = objectMapper.readValue(
+                            msg.getContentParts(),
+                            objectMapper.getTypeFactory().constructCollectionType(List.class, MessageContentPart.class)
+                        );
+                        for (MessageContentPart part : parts) {
+                            if ("file".equals(part.getType()) && part.getFileName() != null) {
+                                java.nio.file.Path absPath = part.getPath() != null
+                                    ? java.nio.file.Paths.get(part.getPath()).toAbsolutePath().normalize()
+                                    : null;
+                                fileLines.add("- " + part.getFileName() + ": "
+                                    + (absPath != null ? absPath.toString() : part.getPath()));
+                            }
+                        }
+                    } catch (Exception ignored) { }
+                }
+            }
+            if (!fileLines.isEmpty()) {
+                ctx.append("[用户上传的文件]\n");
+                for (String line : fileLines) {
+                    ctx.append(line).append("\n");
+                }
+                ctx.append("\n");
+            }
+            // ── 文件列表结束 ──
             ctx.append("# 以下是对话历史上下文\n\n");
             Map<Long, String> agentNameCache = new HashMap<>();
             for (MessageEntity msg : history) {
