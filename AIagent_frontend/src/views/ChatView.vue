@@ -54,7 +54,7 @@ function getEffectiveAgentId() {
   return convStore.activeConversation?.agentId || agentStore.selectedAgentId
 }
 
-function handleSendMessage(text) {
+function handleSendMessage(text, files) {
   const isGroupChat = convStore.activeConversation?.conversationType === 'group'
   const agentId = getEffectiveAgentId()
   if (!agentId && !isGroupChat) {
@@ -73,7 +73,13 @@ function handleSendMessage(text) {
     .filter(m => matches.some(match => match[1] === m.agentName))
     .map(m => m.agentId)
 
-  chatStore.sendMessage(text, agentId, mentionedAgentIds.length > 0 ? { mentionedAgentIds } : undefined)
+  const hasMentions = mentionedAgentIds.length > 0
+  const hasFiles = files && files.length > 0
+  const options = {}
+  if (hasMentions) options.mentionedAgentIds = mentionedAgentIds
+  if (hasFiles) options.files = files
+
+  chatStore.sendMessage(text, agentId, Object.keys(options).length > 0 ? options : undefined)
   composerPrefillText.value = ''
 }
 
