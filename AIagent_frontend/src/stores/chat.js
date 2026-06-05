@@ -202,48 +202,8 @@ export const useChatStore = defineStore('chat', () => {
 
     sse = useSSE()
 
-    // ── Safety timeouts: prevent UI from getting stuck if SSE drops ──
-    let contentReceived = false
-    const NO_CONTENT_TIMEOUT = 30_000   // 30s without any content delta
-    const MAX_STREAM_TIME = 90_000      // 90s total max
-
-    let contentTimeoutId = setTimeout(() => {
-      if (!contentReceived && isStreaming.value && agentStreams.value.size === 0) {
-        streamError.value = 'Agent 响应超时，请重试'
-        updateMessage(assistantId, { status: 'error' })
-        isStreaming.value = false
-        sse.disconnect()
-      }
-    }, NO_CONTENT_TIMEOUT)
-
-    let maxTimeId
-    function scheduleMaxTimeCheck() {
-      maxTimeId = setTimeout(() => {
-        if (!isStreaming.value) return
-        if (agentStreams.value.size > 0) {
-          scheduleMaxTimeCheck()
-          return
-        }
-        updateMessage(assistantId, { status: 'completed' })
-        isStreaming.value = false
-        sse.disconnect()
-      }, MAX_STREAM_TIME)
-    }
-    scheduleMaxTimeCheck()
-
     // Backend broadcasts content as "content_delta" events
     sse.on('content_delta', (data) => {
-      contentReceived = true
-      clearTimeout(contentTimeoutId)
-      contentTimeoutId = setTimeout(() => {
-        if (isStreaming.value && agentStreams.value.size === 0) {
-          streamError.value = 'Agent 响应超时，请重试'
-          updateMessage(assistantId, { status: 'error' })
-          isStreaming.value = false
-          sse.disconnect()
-        }
-      }, NO_CONTENT_TIMEOUT)
-
       // Route to correct agent bubble in group chat, or orchestrator otherwise
       const targetId = data.agentName
         ? (agentStreams.value.get(data.agentName) || assistantId)
@@ -351,8 +311,6 @@ export const useChatStore = defineStore('chat', () => {
       // Unlock the composer so user can type while DAG is paused
       // SSE stays open to receive continued agent output
       isStreaming.value = false
-      clearTimeout(contentTimeoutId)
-      clearTimeout(maxTimeId)
     })
 
     sse.on('delegation_progress', (data) => {
@@ -387,8 +345,6 @@ export const useChatStore = defineStore('chat', () => {
 
     sse.on('done', async (data) => {
       doneReceived = true
-      clearTimeout(contentTimeoutId)
-      clearTimeout(maxTimeId)
 
       // Replace local message ID with server-assigned ID
       const serverMsgId = data.assistantMessageId ? String(data.assistantMessageId) : null
@@ -440,9 +396,7 @@ export const useChatStore = defineStore('chat', () => {
     })
 
     sse.on('error', (data) => {
-      clearTimeout(contentTimeoutId)
-      clearTimeout(maxTimeId)
-      streamError.value = data.message || 'Stream error'
+streamError.value = data.message || 'Stream error'
       updateMessage(assistantId, { status: 'error' })
       isStreaming.value = false
       sse.disconnect()
@@ -463,8 +417,6 @@ export const useChatStore = defineStore('chat', () => {
             updateMessage(assistantId, { status: 'completed' })
             isStreaming.value = false
             sse.disconnect()
-            clearTimeout(contentTimeoutId)
-            clearTimeout(maxTimeId)
           }
         }, 3000)
       }
