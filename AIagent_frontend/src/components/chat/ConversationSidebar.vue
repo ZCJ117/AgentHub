@@ -3,12 +3,14 @@ import { watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useConversationStore } from '@/stores/conversation'
 import { useAgentStore } from '@/stores/agent'
-import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSpin } from 'naive-ui'
+import { NAvatar, NTag, NBadge, NInput, NButton, NDropdown, NSpace, NSpin, NIcon } from 'naive-ui'
+import { ChevronBackOutline } from '@vicons/ionicons5'
 import { createDirectConversation } from '@/api/conversations'
 import AgentSelector from '@/components/agent/AgentSelector.vue'
 import { useAgentSelector } from '@/composables/useAgentSelector'
 
 const router = useRouter()
+const emit = defineEmits(['collapse'])
 const convStore = useConversationStore()
 const agentStore = useAgentStore()
 
@@ -25,6 +27,9 @@ watch(() => convStore.filter, () => {
 function selectConversation(idOrConv) {
   const id = typeof idOrConv === 'object' ? (idOrConv.conversationId || idOrConv.id) : idOrConv
   convStore.setActive(id)
+  if (typeof idOrConv === 'object' && idOrConv.conversationType === 'direct' && idOrConv.agentId) {
+    agentStore.selectAgent(idOrConv.agentId)
+  }
   router.push(`/chat/${id}`)
 }
 
@@ -138,6 +143,9 @@ function handleContextMenu(key, conv) {
           clearable
           size="small"
         />
+        <NButton text size="small" @click="emit('collapse')" class="collapse-btn" title="收起侧边栏">
+          <NIcon :component="ChevronBackOutline" size="16" />
+        </NButton>
       </NSpace>
     </div>
 
@@ -154,7 +162,12 @@ function handleContextMenu(key, conv) {
           @click="selectConversation(conv)"
         >
           <div class="conv-content">
-            <NAvatar :size="40" :src="conv.agentAvatarUrl" round>
+            <NAvatar v-if="conv.agentAvatarUrl" :size="40" :src="conv.agentAvatarUrl" round>
+              <template #fallback>
+                {{ (conv.title || conv.agentName || '?')[0] }}
+              </template>
+            </NAvatar>
+            <NAvatar v-else :size="40" round>
               {{ (conv.title || conv.agentName || '?')[0] }}
             </NAvatar>
             <div class="conv-info">
@@ -321,6 +334,15 @@ function handleContextMenu(key, conv) {
 .type-filter :deep(.n-button) {
   flex: 1;
   border-radius: 8px;
+}
+
+.collapse-btn {
+  align-self: flex-end;
+  color: #999;
+  margin-top: 4px;
+}
+.collapse-btn:hover {
+  color: #666;
 }
 
 .empty-list {

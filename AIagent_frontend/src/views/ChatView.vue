@@ -10,7 +10,8 @@ import { interruptChat, continueDag } from '@/api/chat'
 import { pinMessage, unpinMessage } from '@/api/conversations'
 import { fetchReplyChain } from '@/api/messages'
 import { renderMarkdown } from '@/composables/useMarkdown'
-import { NModal, NTimeline, NTimelineItem } from 'naive-ui'
+import { NModal, NTimeline, NTimelineItem, NIcon } from 'naive-ui'
+import { ChevronForwardOutline } from '@vicons/ionicons5'
 import ConversationSidebar from '@/components/chat/ConversationSidebar.vue'
 import ChatArea from '@/components/chat/ChatArea.vue'
 import TopBar from '@/components/layout/TopBar.vue'
@@ -26,6 +27,7 @@ const artifactStore = useArtifactStore()
 
 const composerPrefillText = ref('')
 const chatAreaRef = ref(null)
+const sidebarCollapsed = ref(false)
 
 provide('scrollToMessage', (messageId) => {
   chatAreaRef.value?.scrollToMessage(messageId)
@@ -182,7 +184,10 @@ function formatTimestamp(ts) {
 
 <template>
   <div class="chat-view">
-    <ConversationSidebar />
+    <ConversationSidebar v-show="!sidebarCollapsed" @collapse="sidebarCollapsed = true" />
+    <button v-show="sidebarCollapsed" class="sidebar-expand-btn" @click="sidebarCollapsed = false">
+      <NIcon :component="ChevronForwardOutline" size="18" />
+    </button>
     <div class="chat-main">
       <TopBar />
       <ChatArea
@@ -241,5 +246,23 @@ function formatTimestamp(ts) {
   flex-direction: column;
   min-width: 0;
   background: #FFFFFF;
+}
+
+.sidebar-expand-btn {
+  width: 32px;
+  height: 60px;
+  align-self: center;
+  border: 1px solid #E5E5EA;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background: #F5F5F7;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+}
+.sidebar-expand-btn:hover {
+  background: #E8E8ED;
 }
 </style>
