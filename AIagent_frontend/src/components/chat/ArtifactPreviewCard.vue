@@ -71,6 +71,8 @@ const messageText = computed(() => {
   return msg
 })
 
+const renderedMessageText = computed(() => renderMarkdown(messageText.value))
+
 function handlePreview() {
   if (isEphemeral.value) {
     const content = displayContent.value
@@ -107,7 +109,7 @@ function handleDownload() {
     </div>
 
     <!-- Agent's explanation text -->
-    <div v-if="messageText" class="artifact-message-text">{{ messageText }}</div>
+    <div v-if="messageText" class="artifact-message-text" v-html="renderedMessageText" />
 
     <!-- code/website/data/stylesheet: NCode 代码块 -->
     <div v-if="showCodeBlock && displayContent" class="artifact-code">
