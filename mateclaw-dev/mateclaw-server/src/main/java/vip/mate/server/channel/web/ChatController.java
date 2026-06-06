@@ -2177,6 +2177,17 @@ public class ChatController {
                         interceptWriteFileForPreview(conversationId, resultStr, wsPath);
                     }
                 }
+            } else if ("tool_result".equals(eventType)) {
+                // Bridge agent (CLI/WS) tool_result events — same interception
+                String toolName = String.valueOf(data.getOrDefault("toolName", ""));
+                if ("write_file".equals(toolName)
+                        && Boolean.TRUE.equals(data.getOrDefault("success", false))) {
+                    String wsPath = String.valueOf(data.getOrDefault("workspaceBasePath", ""));
+                    String resultStr = String.valueOf(data.getOrDefault("result", ""));
+                    if (!wsPath.isBlank() && !resultStr.isBlank()) {
+                        interceptWriteFileForPreview(conversationId, resultStr, wsPath);
+                    }
+                }
             }
         }
 

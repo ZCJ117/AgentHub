@@ -66,7 +66,8 @@ public class LocalCliProcessManager {
             Thread stdoutReaderThread,
             FluxSink<AgentService.StreamDelta> responseSink,
             long spawnTime,
-            String cliType
+            String cliType,
+            String workDir
     ) {}
 
     /** Persistent Claude Code session IDs for --resume across chat requests */
@@ -138,7 +139,7 @@ public class LocalCliProcessManager {
 
             long now = System.currentTimeMillis();
             ProcessContext ctx = new ProcessContext(
-                    p, stdinWriter, null, null, null, now, cliType);
+                    p, stdinWriter, null, null, null, now, cliType, workingDir);
 
             // 创建 stdout 读取线程（先不启动，等握手完成后再启动以避免竞态）
             var reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8));
@@ -156,7 +157,7 @@ public class LocalCliProcessManager {
             stderrThread.start();
 
             processes.put(agentId, new ProcessContext(
-                    p, stdinWriter, reader, readerThread, null, now, cliType));
+                    p, stdinWriter, reader, readerThread, null, now, cliType, workingDir));
 
             // 握手：等待适配器 ready
             String firstLine = readLineWithTimeout(reader, 10, TimeUnit.SECONDS);
@@ -288,7 +289,7 @@ public class LocalCliProcessManager {
                     ctx.process(), ctx.stdinWriter(),
                     ctx.reader(),
                     ctx.stdoutReaderThread(), sink,
-                    ctx.spawnTime(), ctx.cliType());
+                    ctx.spawnTime(), ctx.cliType(), ctx.workDir());
         });
     }
 
@@ -298,7 +299,7 @@ public class LocalCliProcessManager {
                         ctx.process(), ctx.stdinWriter(),
                         ctx.reader(),
                         ctx.stdoutReaderThread(), null,
-                        ctx.spawnTime(), ctx.cliType()));
+                        ctx.spawnTime(), ctx.cliType(), ctx.workDir()));
     }
 
     public void pushToSink(String agentId, AgentService.StreamDelta delta) {
@@ -381,9 +382,16 @@ public class LocalCliProcessManager {
                 pushToSink(agentId,
                         AgentService.StreamDelta.event("tool_call", frame.getPayload()));
 
-            case "tool_result" ->
+            case "tool_result" -> {
+                java.util.Map<String, Object> payload =
+                        new java.util.LinkedHashMap<>(frame.getPayload());
+                ProcessContext ctx = processes.get(agentId);
+                if (ctx != null && ctx.workDir() != null && !ctx.workDir().isBlank()) {
+                    payload.putIfAbsent("workspaceBasePath", ctx.workDir());
+                }
                 pushToSink(agentId,
-                        AgentService.StreamDelta.event("tool_result", frame.getPayload()));
+                        AgentService.StreamDelta.event("tool_result", payload));
+            }
 
             case "artifact_preview" ->
                 pushToSink(agentId,
