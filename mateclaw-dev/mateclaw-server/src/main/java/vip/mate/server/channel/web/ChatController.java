@@ -2168,7 +2168,67 @@ public class ChatController {
                         break;
                     }
                 }
+                // 拦截 write_file 工具完成，推送 artifact_preview
+                if ("write_file".equals(toolName)
+                        && Boolean.TRUE.equals(data.getOrDefault("success", false))) {
+                    String wsPath = String.valueOf(data.getOrDefault("workspaceBasePath", ""));
+                    String resultStr = String.valueOf(data.getOrDefault("result", ""));
+                    if (!wsPath.isBlank() && !resultStr.isBlank()) {
+                        interceptWriteFileForPreview(conversationId, resultStr, wsPath);
+                    }
+                }
             }
+        }
+
+        /**
+         * 拦截 write_file 工具结果：读取刚写入的文件内容，推送 artifact_preview SSE 事件。
+         * 异常时静默跳过，不中断 SSE 流。
+         */
+        private void interceptWriteFileForPreview(String conversationId,
+                                                   String resultJson,
+                                                   String workspaceBasePath) {
+            try {
+                Map<String, Object> parsed = objectMapper.readValue(resultJson, Map.class);
+                String filePath = String.valueOf(parsed.getOrDefault("filePath", ""));
+                if (filePath.isBlank()) return;
+
+                String artifactType = inferArtifactType(filePath);
+                java.nio.file.Path absPath = java.nio.file.Path.of(workspaceBasePath, filePath);
+                if (!java.nio.file.Files.exists(absPath)) return;
+
+                String content = java.nio.file.Files.readString(absPath);
+                if (content.length() > 512 * 1024) {
+                    content = content.substring(0, 512 * 1024) + "\n\n[Content truncated at 512KB]";
+                }
+
+                long artifactId = Math.abs((long) (conversationId + filePath).hashCode());
+                String name = absPath.getFileName().toString();
+
+                streamTracker.emitArtifactPreview(conversationId, artifactId,
+                        artifactType, name, content, /* previewUrl */ "");
+            } catch (Exception e) {
+                log.debug("[StreamAccumulator] Failed to emit artifact preview for write_file: {}",
+                        e.getMessage());
+            }
+        }
+
+        /** 根据文件扩展名确定 artifact 类型 */
+        private static String inferArtifactType(String filePath) {
+            String lower = filePath.toLowerCase();
+            if (lower.endsWith(".html") || lower.endsWith(".htm")) return "website";
+            if (lower.endsWith(".md")) return "document";
+            if (lower.endsWith(".css") || lower.endsWith(".scss")
+                    || lower.endsWith(".less") || lower.endsWith(".sass")) return "stylesheet";
+            if (lower.endsWith(".json") || lower.endsWith(".yaml")
+                    || lower.endsWith(".yml") || lower.endsWith(".xml")
+                    || lower.endsWith(".toml")) return "data";
+            String[] codeExts = {".js", ".ts", ".jsx", ".tsx", ".vue", ".py", ".java",
+                    ".go", ".rs", ".rb", ".php", ".c", ".cpp", ".h",
+                    ".cs", ".swift", ".kt", ".scala", ".sql"};
+            for (String ext : codeExts) {
+                if (lower.endsWith(ext)) return "code";
+            }
+            return "file";
         }
 
         private void ensurePlanStepCapacity(int size) {

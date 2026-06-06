@@ -264,9 +264,10 @@ export const useChatStore = defineStore('chat', () => {
           artifactType: data.type || 'html',
           artifactName: data.name || 'New Artifact',
           conversationId: conversationId.value,
-          previewUrl: data.previewUrl
+          previewUrl: data.previewUrl,
+          content: data.content || ''
         })
-        addMessageLocal('assistant', data.previewUrl || '', {
+        addMessageLocal('assistant', data.content || data.previewUrl || '', {
           messageType: 'preview_card',
           artifactRefs: [data.artifactId],
           status: 'completed'
