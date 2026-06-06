@@ -261,7 +261,7 @@ export const useChatStore = defineStore('chat', () => {
       if (data.artifactId) {
         artifactStore.handleArtifactPreview({
           artifactId: data.artifactId,
-          artifactType: data.type || 'html',
+          artifactType: data.type || 'file',
           artifactName: data.name || 'New Artifact',
           conversationId: conversationId.value,
           previewUrl: data.previewUrl,
