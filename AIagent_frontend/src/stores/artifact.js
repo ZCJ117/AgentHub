@@ -136,11 +136,12 @@ export const useArtifactStore = defineStore('artifact', () => {
     }
   }
 
-  function handleArtifactPreview({ artifactId, artifactType, artifactName, conversationId, previewUrl }) {
+  function handleArtifactPreview({ artifactId, artifactType, artifactName, conversationId, previewUrl, content }) {
     const existing = artifacts.value.find(a => a.id === artifactId)
     if (existing) {
       existing.previewUrl = previewUrl
       existing.filePath = previewUrl
+      existing.content = content || existing.content || ''
     } else {
       artifacts.value.unshift({
         id: artifactId,
@@ -149,6 +150,7 @@ export const useArtifactStore = defineStore('artifact', () => {
         conversationId,
         previewUrl,
         filePath: previewUrl,
+        content: content || '',
         deployStatus: 'none',
         currentVersion: 1
       })
