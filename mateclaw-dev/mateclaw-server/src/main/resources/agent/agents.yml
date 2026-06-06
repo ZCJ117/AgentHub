@@ -11,20 +11,11 @@ ai:
           module:
             ai-api:
               base-url: https://api.deepseek.com
-              api-key: sk-a9394adc2ee34af29f74065a6097b98b
+              api-key:                              #在平台申请的API Key
               completions-path: v1/chat/completions
               embeddings-path: v1/embeddings
             chat-model:
               model: deepseek-v4-flash
-#              tool-mcp-list:
-#                - sse:
-#                    name: baidu-search
-#                    base-uri: http://appbuilder.baidu.com/v2/ai_search/mcp/
-#                    sse-endpoint: sse?api_key=bce-v3/ALTAK-WjK8NIh3txZo7rXXEjhri/e2f09d53de961bcaf2609b76c7c7a7e6d0f05da3
-#                    request-timeout: 500000
-#              tool-skills-list:
-#                - type: resource
-#                  path: agent/skills
             agents:
               - name: Agent01
                 description: 任务分配智能体
@@ -91,9 +82,6 @@ ai:
                   当同一任务可由多个业群的智能体完成时，优先选择与任务领域最贴合的业群，并兼顾负载均衡。
                   
                   如果涉及跨业群协同，可在任务描述中简要注明协作方，如“需从 人力Agent 获取组织架构后处理”。
-
-
-
 
           runner:
               agent-name: Agent01
