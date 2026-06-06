@@ -103,13 +103,13 @@ function handleDownload() {
 </script>
 
 <template>
+  <!-- Agent's explanation text — rendered outside the artifact card -->
+  <div v-if="messageText" class="artifact-message-text" v-html="renderedMessageText" />
+
   <div class="artifact-preview-card">
     <div class="artifact-header">
       <span class="artifact-name">{{ displayName }}</span>
     </div>
-
-    <!-- Agent's explanation text -->
-    <div v-if="messageText" class="artifact-message-text" v-html="renderedMessageText" />
 
     <!-- code/website/data/stylesheet: NCode 代码块 -->
     <div v-if="showCodeBlock && displayContent" class="artifact-code">
