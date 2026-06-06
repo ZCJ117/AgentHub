@@ -10,13 +10,18 @@ const props = defineProps({
 
 const emit = defineEmits(['preview', 'edit', 'deploy', 'download'])
 
-// Fall back to message.content when artifact is missing (page refresh clears Pinia store)
+// displayContent = actual file code from artifact. Never fall back to message.content
+// because message.content is the agent's explanation text, not code.
 const displayContent = computed(() =>
-  props.artifact?.content || props.message?.content || ''
+  props.artifact?.content || ''
 )
-const displayName = computed(() =>
-  props.artifact?.artifactName || '产物'
-)
+const displayName = computed(() => {
+  if (props.artifact?.artifactName) return props.artifact.artifactName
+  // Try to extract filename from message content (e.g. "文件位置：xxx.html")
+  const msg = props.message?.content || ''
+  const m = msg.match(/[^\s`"'*]+\.(html?|md|jsx?|tsx?|vue|css|py|java|json)\b/i)
+  return m ? m[0] : '产物'
+})
 const displayType = computed(() => {
   if (props.artifact?.artifactType) return props.artifact.artifactType
   // Infer from message content when artifact is missing
