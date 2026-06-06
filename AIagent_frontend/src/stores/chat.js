@@ -64,30 +64,49 @@ export const useChatStore = defineStore('chat', () => {
   const isEmpty = computed(() => messages.value.length === 0)
 
   function restoreEphemeralPreviewCards() {
-    // On page reload, messages from DB don't have preview_card type.
-    // Match them with artifacts from sessionStorage.
     try {
       const raw = sessionStorage.getItem('agenthub_ephemeral_artifacts')
-      if (!raw) return
-      const artifacts = JSON.parse(raw)
-      if (!Array.isArray(artifacts) || artifacts.length === 0) return
+      if (!raw) { console.log('[restoreEphemeral] no sessionStorage data'); return }
+      const savedArtifacts = JSON.parse(raw)
+      if (!Array.isArray(savedArtifacts) || savedArtifacts.length === 0) {
+        console.log('[restoreEphemeral] empty artifacts array'); return
+      }
 
       const convId = conversationId.value
-      const convArtifacts = artifacts.filter(a => a.conversationId === convId)
-      if (convArtifacts.length === 0) return
+      const convArtifacts = savedArtifacts.filter(a => a.conversationId === convId)
+      if (convArtifacts.length === 0) {
+        console.log('[restoreEphemeral] no artifacts for conv', convId)
+        return
+      }
 
-      // Find the last assistant message (most likely the one with artifact) and upgrade it
-      for (let i = messages.value.length - 1; i >= 0; i--) {
-        const m = messages.value[i]
-        if (m.role === 'assistant') {
-          updateMessage(m.id, {
-            messageType: 'preview_card',
-            artifactRefs: convArtifacts.map(a => a.id)
-          })
-          break
+      // Also ensure artifacts are in the Pinia store (may not be if store init happened before sessionStorage was populated)
+      const artifactStore = useArtifactStore()
+      const refIds = convArtifacts.map(a => a.id)
+      for (const art of convArtifacts) {
+        if (!artifactStore.artifacts.find(a => a.id === art.id)) {
+          artifactStore.artifacts.unshift(art)
         }
       }
-    } catch (e) { /* ignore */ }
+
+      // Upgrade all assistant messages that don't already have a preview_card
+      // (there could be multiple if the conversation had multiple turns)
+      let upgraded = 0
+      for (let i = messages.value.length - 1; i >= 0; i--) {
+        const m = messages.value[i]
+        if (m.role === 'assistant' && m.messageType !== 'preview_card') {
+          updateMessage(m.id, {
+            messageType: 'preview_card',
+            artifactRefs: refIds
+          })
+          upgraded++
+        }
+      }
+      if (upgraded === 0) {
+        console.log('[restoreEphemeral] no assistant messages found to upgrade')
+      }
+    } catch (e) {
+      console.error('[restoreEphemeral] error:', e)
+    }
   }
 
   function addMessageLocal(role, content, extra = {}) {
