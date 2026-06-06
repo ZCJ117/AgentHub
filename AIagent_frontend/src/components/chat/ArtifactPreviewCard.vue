@@ -57,6 +57,15 @@ const codeLanguage = computed(() => {
 
 const renderedMd = computed(() => renderMarkdown(displayContent.value))
 
+// Show the agent's explanation text above the artifact when the message content
+// differs from the artifact content (i.e. agent wrote text before producing code)
+const messageText = computed(() => {
+  const msg = props.message?.content || ''
+  const art = props.artifact?.content || ''
+  if (!msg || msg === art) return ''
+  return msg
+})
+
 function handlePreview() {
   if (isEphemeral.value) {
     const content = displayContent.value
@@ -91,6 +100,9 @@ function handleDownload() {
     <div class="artifact-header">
       <span class="artifact-name">{{ displayName }}</span>
     </div>
+
+    <!-- Agent's explanation text -->
+    <div v-if="messageText" class="artifact-message-text">{{ messageText }}</div>
 
     <!-- code/website/data/stylesheet: NCode 代码块 -->
     <div v-if="showCodeBlock && displayContent" class="artifact-code">
@@ -141,6 +153,15 @@ function handleDownload() {
 
 .artifact-actions {
   padding: 8px 16px;
+}
+
+.artifact-message-text {
+  padding: 10px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1D1D1F;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .artifact-code {
