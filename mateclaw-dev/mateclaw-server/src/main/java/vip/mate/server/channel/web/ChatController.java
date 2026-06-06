@@ -2193,8 +2193,9 @@ public class ChatController {
                 if (filePath.isBlank()) return;
 
                 String artifactType = inferArtifactType(filePath);
-                java.nio.file.Path absPath = java.nio.file.Path.of(workspaceBasePath, filePath);
-                if (!java.nio.file.Files.exists(absPath)) return;
+                java.nio.file.Path absPath = java.nio.file.Path.of(workspaceBasePath, filePath).normalize();
+                java.nio.file.Path wsRoot = java.nio.file.Path.of(workspaceBasePath).normalize();
+                if (!absPath.startsWith(wsRoot) || !java.nio.file.Files.exists(absPath)) return;
 
                 String content = java.nio.file.Files.readString(absPath);
                 if (content.length() > 512 * 1024) {
