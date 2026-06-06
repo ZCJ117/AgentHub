@@ -863,10 +863,12 @@ public class ToolExecutionExecutor {
                     result, toolName, pc.toolCall.id(), pc.conversationId, pc.workspaceBasePath);
             log.info("[ToolExecutor] Tool {} returned {} chars{}", toolName, rawLen,
                     result != null && result.length() < rawLen ? " (now " + result.length() + " after spill/truncate)" : "");
-            events.add(GraphEventPublisher.toolComplete(pc.toolCall.id(), toolName, result, true));
+            events.add(GraphEventPublisher.toolComplete(pc.toolCall.id(), toolName, result, true,
+                    pc.workspaceBasePath));
             if (streamTracker != null) {
                 streamTracker.broadcastObject(pc.conversationId, GraphEventPublisher.EVENT_TOOL_COMPLETE,
-                        GraphEventPublisher.toolComplete(pc.toolCall.id(), toolName, result, true).data());
+                        GraphEventPublisher.toolComplete(pc.toolCall.id(), toolName, result, true,
+                                pc.workspaceBasePath).data());
                 streamTracker.updateRunningTool(pc.conversationId, null);
             }
             return new ToolResponseMessage.ToolResponse(
@@ -881,10 +883,12 @@ public class ToolExecutionExecutor {
             String reportedError = isReturnDirect(pc.callback)
                     ? "Tool execution failed (details withheld per returnDirect policy)"
                     : normalizeToolExecutionError(e);
-            events.add(GraphEventPublisher.toolComplete(pc.toolCall.id(), toolName, reportedError, false));
+            events.add(GraphEventPublisher.toolComplete(pc.toolCall.id(), toolName, reportedError, false,
+                    pc.workspaceBasePath));
             if (streamTracker != null) {
                 streamTracker.broadcastObject(pc.conversationId, GraphEventPublisher.EVENT_TOOL_COMPLETE,
-                        GraphEventPublisher.toolComplete(pc.toolCall.id(), toolName, reportedError, false).data());
+                        GraphEventPublisher.toolComplete(pc.toolCall.id(), toolName, reportedError, false,
+                                pc.workspaceBasePath).data());
                 streamTracker.updateRunningTool(pc.conversationId, null);
             }
             return new ToolResponseMessage.ToolResponse(

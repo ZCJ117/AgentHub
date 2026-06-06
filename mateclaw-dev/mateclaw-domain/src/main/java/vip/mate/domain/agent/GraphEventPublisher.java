@@ -130,6 +130,21 @@ public final class GraphEventPublisher {
         ), ts);
     }
 
+    public static GraphEvent toolComplete(String toolCallId, String toolName, String result,
+                                           boolean success, String workspaceBasePath) {
+        long ts = System.currentTimeMillis();
+        Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("toolCallId", toolCallId != null ? toolCallId : "");
+        data.put("toolName", toolName);
+        data.put("result", result != null ? result : "");
+        data.put("success", success);
+        data.put("timestamp", ts);
+        if (workspaceBasePath != null && !workspaceBasePath.isBlank()) {
+            data.put("workspaceBasePath", workspaceBasePath);
+        }
+        return new GraphEvent(EVENT_TOOL_COMPLETE, Map.copyOf(data), ts);
+    }
+
     public static GraphEvent planCreated(Long planId, List<String> steps) {
         long ts = System.currentTimeMillis();
         return new GraphEvent(EVENT_PLAN_CREATED, Map.of(
