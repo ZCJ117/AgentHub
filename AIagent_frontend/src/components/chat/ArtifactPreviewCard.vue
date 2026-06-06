@@ -93,12 +93,6 @@ const renderedMd = computed(() => renderMarkdown(props.artifact?.content || ''))
   color: #999;
 }
 
-.preview-frame {
-  width: 100%;
-  min-height: 240px;
-  border: none;
-}
-
 .artifact-actions {
   padding: 8px 16px;
 }
