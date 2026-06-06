@@ -73,13 +73,17 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       const convId = conversationId.value
-      const convArtifacts = savedArtifacts.filter(a => a.conversationId === convId)
+      console.log('[restoreEphemeral] current convId:', convId, 'stored artifacts:', savedArtifacts.map(a => ({ id: a.id, convId: a.conversationId, name: a.artifactName })))
+
+      // Try exact match first, then fall back to all artifacts (conversationId may differ
+      // between SSE stream and page load for group/orchestrated chats)
+      let convArtifacts = savedArtifacts.filter(a => a.conversationId === convId)
       if (convArtifacts.length === 0) {
-        console.log('[restoreEphemeral] no artifacts for conv', convId)
-        return
+        console.log('[restoreEphemeral] no exact conv match, using all artifacts as fallback')
+        convArtifacts = savedArtifacts
       }
 
-      // Also ensure artifacts are in the Pinia store (may not be if store init happened before sessionStorage was populated)
+      // Also ensure artifacts are in the Pinia store
       const artifactStore = useArtifactStore()
       const refIds = convArtifacts.map(a => a.id)
       for (const art of convArtifacts) {
