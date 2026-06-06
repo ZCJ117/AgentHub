@@ -638,7 +638,8 @@ public class ToolExecutionExecutor {
                     result, toolName, toolCall.id(), conversationId, workspaceBasePath);
             log.info("[ToolExecutor] Pre-approved tool {} returned {} chars{}", toolName, rawLen,
                     result != null && result.length() < rawLen ? " (now " + result.length() + " after spill/truncate)" : "");
-            events.add(GraphEventPublisher.toolComplete(toolCall.id(), toolName, result, true));
+            events.add(GraphEventPublisher.toolComplete(toolCall.id(), toolName, result, true,
+                    workspaceBasePath));
             return new ToolResponseMessage.ToolResponse(
                     toolCall.id(), toolName, result != null ? result : "");
         } catch (Exception e) {
@@ -646,7 +647,8 @@ public class ToolExecutionExecutor {
             String safeError = isReturnDirect(callback)
                     ? "Tool execution failed (details withheld per returnDirect policy)"
                     : "Tool execution failed: " + e.getMessage();
-            events.add(GraphEventPublisher.toolComplete(toolCall.id(), toolName, safeError, false));
+            events.add(GraphEventPublisher.toolComplete(toolCall.id(), toolName, safeError, false,
+                    workspaceBasePath));
             return new ToolResponseMessage.ToolResponse(toolCall.id(), toolName, safeError);
         }
     }
