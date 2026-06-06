@@ -408,6 +408,7 @@ public class LocalCliProcessManager {
                     pushToSink(agentId,
                             new AgentService.StreamDelta(finalDelta.toString(), null));
                 }
+                scanWorkspaceForArtifacts(agentId);
                 completeSink(agentId);
             }
 
@@ -440,6 +441,72 @@ public class LocalCliProcessManager {
                         frame.getType(), agentId,
                         frame.getPayload() != null ? frame.getPayload().keySet() : "null");
         }
+    }
+
+    /**
+     * 当 CLI Agent 完成时扫描工作区，为匹配的文件推送 artifact_preview 事件。
+     * CLI Agent 在进程内自行写文件，不会产生 tool_result 帧，因此需要在会话结束时主动发现产物。
+     */
+    private void scanWorkspaceForArtifacts(String agentId) {
+        ProcessContext ctx = processes.get(agentId);
+        if (ctx == null || ctx.workDir() == null || ctx.workDir().isBlank()) return;
+        java.nio.file.Path dir = java.nio.file.Path.of(ctx.workDir());
+        if (!java.nio.file.Files.isDirectory(dir)) return;
+
+        try (var stream = java.nio.file.Files.list(dir)) {
+            stream.filter(java.nio.file.Files::isRegularFile)
+                  .filter(p -> isPreviewableFile(p.getFileName().toString()))
+                  .forEach(p -> emitFileArtifactPreview(agentId, p));
+        } catch (Exception e) {
+            log.debug("[CliPM] Workspace scan failed for agent={}: {}", agentId, e.getMessage());
+        }
+    }
+
+    private static boolean isPreviewableFile(String name) {
+        String lower = name.toLowerCase();
+        return lower.endsWith(".html") || lower.endsWith(".htm")
+                || lower.endsWith(".md")
+                || lower.endsWith(".css") || lower.endsWith(".scss") || lower.endsWith(".less")
+                || lower.endsWith(".js") || lower.endsWith(".ts") || lower.endsWith(".jsx") || lower.endsWith(".tsx")
+                || lower.endsWith(".vue") || lower.endsWith(".py") || lower.endsWith(".java")
+                || lower.endsWith(".json") || lower.endsWith(".yaml") || lower.endsWith(".yml")
+                || lower.endsWith(".xml") || lower.endsWith(".go") || lower.endsWith(".rs")
+                || lower.endsWith(".rb") || lower.endsWith(".php") || lower.endsWith(".c")
+                || lower.endsWith(".cpp") || lower.endsWith(".h") || lower.endsWith(".cs")
+                || lower.endsWith(".swift") || lower.endsWith(".kt") || lower.endsWith(".scala")
+                || lower.endsWith(".sql") || lower.endsWith(".toml");
+    }
+
+    private void emitFileArtifactPreview(String agentId, java.nio.file.Path file) {
+        try {
+            String content = java.nio.file.Files.readString(file);
+            if (content.length() > 512 * 1024) {
+                content = content.substring(0, 512 * 1024) + "\n\n[Content truncated at 512KB]";
+            }
+            String name = file.getFileName().toString();
+            String type = inferArtifactType(name);
+            long artifactId = Math.abs((long) (agentId + name).hashCode());
+
+            pushToSink(agentId, AgentService.StreamDelta.event("artifact_preview",
+                    java.util.Map.of(
+                            "artifactId", artifactId,
+                            "type", type,
+                            "name", name,
+                            "content", content,
+                            "previewUrl", ""
+                    )));
+        } catch (Exception e) {
+            log.debug("[CliPM] Failed to emit artifact preview for file={}: {}", file, e.getMessage());
+        }
+    }
+
+    private static String inferArtifactType(String fileName) {
+        String lower = fileName.toLowerCase();
+        if (lower.endsWith(".html") || lower.endsWith(".htm")) return "website";
+        if (lower.endsWith(".md")) return "document";
+        if (lower.endsWith(".css") || lower.endsWith(".scss") || lower.endsWith(".less") || lower.endsWith(".sass")) return "stylesheet";
+        if (lower.endsWith(".json") || lower.endsWith(".yaml") || lower.endsWith(".yml") || lower.endsWith(".xml") || lower.endsWith(".toml")) return "data";
+        return "code";
     }
 
     @PreDestroy
