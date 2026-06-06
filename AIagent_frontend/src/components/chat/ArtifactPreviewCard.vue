@@ -167,8 +167,11 @@ function handleDownload() {
   font-size: 14px;
   line-height: 1.6;
   color: #1D1D1F;
-  white-space: pre-wrap;
   word-break: break-word;
+}
+
+.artifact-message-text :deep(p) {
+  margin: 0.25em 0;
 }
 
 .artifact-code {
