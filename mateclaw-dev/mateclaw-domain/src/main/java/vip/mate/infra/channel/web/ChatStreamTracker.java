@@ -1815,16 +1815,21 @@ public class ChatStreamTracker {
      * @param artifactId     artifact id (matches {@code mate_artifact.id})
      * @param type           artifact type (e.g. "document", "image",
      *                       "website", "code", "spreadsheet")
+     * @param name           file name or artifact display name (nullable)
+     * @param content        file content or artifact content body (nullable)
      * @param previewUrl     relative or absolute URL for the preview
      *                       (nullable — the frontend falls back to a
      *                       generic placeholder per type)
      */
-    public void emitArtifactPreview(String conversationId, Long artifactId,
-                                    String type, String previewUrl) {
+    public void emitArtifactPreview(String conversationId, long artifactId,
+                                    String type, String name, String content,
+                                    String previewUrl) {
         if (conversationId == null || conversationId.isBlank()) return;
         broadcastObject(conversationId, "artifact_preview", Map.of(
-                "artifactId", artifactId != null ? artifactId : 0L,
+                "artifactId", artifactId,
                 "type", type != null ? type : "",
+                "name", name != null ? name : "",
+                "content", content != null ? content : "",
                 "previewUrl", previewUrl != null ? previewUrl : ""
         ));
     }
