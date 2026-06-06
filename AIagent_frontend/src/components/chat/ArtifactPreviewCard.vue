@@ -10,6 +10,8 @@ const props = defineProps({
 
 const emit = defineEmits(['preview', 'edit', 'deploy', 'download'])
 
+const isEphemeral = computed(() => !!props.artifact?.content)
+
 const showCodeBlock = computed(() => {
   const t = props.artifact?.artifactType
   return t === 'website' || t === 'code' || t === 'data' || t === 'stylesheet'
@@ -37,6 +39,34 @@ const codeLanguage = computed(() => {
 })
 
 const renderedMd = computed(() => renderMarkdown(props.artifact?.content || ''))
+
+function handlePreview() {
+  if (isEphemeral.value) {
+    const content = props.artifact?.content || ''
+    const name = props.artifact?.artifactName || 'preview.html'
+    const blob = new Blob([content], { type: name.endsWith('.md') ? 'text/markdown' : 'text/html' })
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  } else {
+    emit('preview', props.artifact?.id)
+  }
+}
+
+function handleDownload() {
+  if (isEphemeral.value) {
+    const content = props.artifact?.content || ''
+    const name = props.artifact?.artifactName || 'artifact.txt'
+    const blob = new Blob([content], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = name
+    a.click()
+    URL.revokeObjectURL(url)
+  } else {
+    emit('download', props.artifact?.id)
+  }
+}
 </script>
 
 <template>
@@ -57,10 +87,10 @@ const renderedMd = computed(() => renderMarkdown(props.artifact?.content || ''))
     </div>
 
     <NSpace class="artifact-actions">
-      <NButton size="small" @click="emit('preview', artifact?.id)">预览</NButton>
-      <NButton size="small" @click="emit('edit', artifact?.id)">编辑</NButton>
-      <NButton size="small" type="primary" @click="emit('deploy', artifact?.id)">部署</NButton>
-      <NButton size="small" @click="emit('download', artifact?.id)">下载</NButton>
+      <NButton size="small" @click="handlePreview">{{ isEphemeral ? '在新标签页打开' : '预览' }}</NButton>
+      <NButton v-if="!isEphemeral" size="small" @click="emit('edit', artifact?.id)">编辑</NButton>
+      <NButton v-if="!isEphemeral" size="small" type="primary" @click="emit('deploy', artifact?.id)">部署</NButton>
+      <NButton size="small" @click="handleDownload">下载</NButton>
     </NSpace>
   </div>
 </template>
