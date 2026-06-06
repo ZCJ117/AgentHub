@@ -136,6 +136,32 @@ export const useArtifactStore = defineStore('artifact', () => {
     }
   }
 
+  const EPHEMERAL_KEY = 'agenthub_ephemeral_artifacts'
+
+  function loadEphemeralArtifacts() {
+    try {
+      const raw = sessionStorage.getItem(EPHEMERAL_KEY)
+      if (raw) {
+        const saved = JSON.parse(raw)
+        if (Array.isArray(saved)) {
+          artifacts.value = saved
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function saveEphemeralArtifacts() {
+    try {
+      const ephemeral = artifacts.value.filter(a => a.content)
+      if (ephemeral.length > 0) {
+        sessionStorage.setItem(EPHEMERAL_KEY, JSON.stringify(ephemeral.slice(0, 20)))
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  // Restore ephemeral artifacts on store init
+  loadEphemeralArtifacts()
+
   function handleArtifactPreview({ artifactId, artifactType, artifactName, conversationId, previewUrl, content }) {
     const existing = artifacts.value.find(a => a.id === artifactId)
     if (existing) {
@@ -155,6 +181,7 @@ export const useArtifactStore = defineStore('artifact', () => {
         currentVersion: 1
       })
     }
+    saveEphemeralArtifacts()
   }
 
   return {

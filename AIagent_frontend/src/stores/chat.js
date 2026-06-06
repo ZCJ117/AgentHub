@@ -63,6 +63,33 @@ export const useChatStore = defineStore('chat', () => {
 
   const isEmpty = computed(() => messages.value.length === 0)
 
+  function restoreEphemeralPreviewCards() {
+    // On page reload, messages from DB don't have preview_card type.
+    // Match them with artifacts from sessionStorage.
+    try {
+      const raw = sessionStorage.getItem('agenthub_ephemeral_artifacts')
+      if (!raw) return
+      const artifacts = JSON.parse(raw)
+      if (!Array.isArray(artifacts) || artifacts.length === 0) return
+
+      const convId = conversationId.value
+      const convArtifacts = artifacts.filter(a => a.conversationId === convId)
+      if (convArtifacts.length === 0) return
+
+      // Find the last assistant message (most likely the one with artifact) and upgrade it
+      for (let i = messages.value.length - 1; i >= 0; i--) {
+        const m = messages.value[i]
+        if (m.role === 'assistant') {
+          updateMessage(m.id, {
+            messageType: 'preview_card',
+            artifactRefs: convArtifacts.map(a => a.id)
+          })
+          break
+        }
+      }
+    } catch (e) { /* ignore */ }
+  }
+
   function addMessageLocal(role, content, extra = {}) {
     const id = nextLocalId()
     messages.value.push({
@@ -130,6 +157,8 @@ export const useChatStore = defineStore('chat', () => {
       messages.value = msgs
       hasMoreHistory.value = data?.hasMore || false
       nextBeforeId.value = data?.nextBeforeId || null
+      // Restore ephemeral artifact preview cards from sessionStorage
+      restoreEphemeralPreviewCards()
     } catch (err) {
       console.warn('Failed to load message history:', err)
       if (err.response?.status === 403 || err.response?.status === 404) {
@@ -267,11 +296,17 @@ export const useChatStore = defineStore('chat', () => {
           previewUrl: data.previewUrl,
           content: data.content || ''
         })
-        addMessageLocal('assistant', data.content || data.previewUrl || '', {
-          messageType: 'preview_card',
-          artifactRefs: [data.artifactId],
-          status: 'completed'
-        })
+        // Upgrade the last assistant message to a preview_card so it persists with the conversation
+        for (let i = messages.value.length - 1; i >= 0; i--) {
+          const m = messages.value[i]
+          if (m.role === 'assistant' && m.messageType === 'text') {
+            updateMessage(m.id, {
+              messageType: 'preview_card',
+              artifactRefs: [data.artifactId]
+            })
+            break
+          }
+        }
       }
     })
 

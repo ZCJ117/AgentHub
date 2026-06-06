@@ -10,17 +10,34 @@ const props = defineProps({
 
 const emit = defineEmits(['preview', 'edit', 'deploy', 'download'])
 
-const isEphemeral = computed(() => !!props.artifact?.content)
+// Fall back to message.content when artifact is missing (page refresh clears Pinia store)
+const displayContent = computed(() =>
+  props.artifact?.content || props.message?.content || ''
+)
+const displayName = computed(() =>
+  props.artifact?.artifactName || '产物'
+)
+const displayType = computed(() => {
+  if (props.artifact?.artifactType) return props.artifact.artifactType
+  // Infer from message content when artifact is missing
+  const name = displayName.value.toLowerCase()
+  if (name.endsWith('.md')) return 'document'
+  if (name.endsWith('.html') || name.endsWith('.htm')) return 'website'
+  if (name.endsWith('.css') || name.endsWith('.scss') || name.endsWith('.less')) return 'stylesheet'
+  return 'code'
+})
+
+const isEphemeral = computed(() => !props.artifact || !!props.artifact?.content)
 
 const showCodeBlock = computed(() => {
-  const t = props.artifact?.artifactType
+  const t = displayType.value
   return t === 'website' || t === 'code' || t === 'data' || t === 'stylesheet'
 })
 
-const showDocument = computed(() => props.artifact?.artifactType === 'document')
+const showDocument = computed(() => displayType.value === 'document')
 
 const codeLanguage = computed(() => {
-  const name = props.artifact?.artifactName || ''
+  const name = displayName.value.toLowerCase()
   if (name.endsWith('.html') || name.endsWith('.htm')) return 'html'
   if (name.endsWith('.js')) return 'javascript'
   if (name.endsWith('.ts')) return 'typescript'
@@ -38,12 +55,12 @@ const codeLanguage = computed(() => {
   return 'text'
 })
 
-const renderedMd = computed(() => renderMarkdown(props.artifact?.content || ''))
+const renderedMd = computed(() => renderMarkdown(displayContent.value))
 
 function handlePreview() {
   if (isEphemeral.value) {
-    const content = props.artifact?.content || ''
-    const name = props.artifact?.artifactName || 'preview.html'
+    const content = displayContent.value
+    const name = displayName.value
     const blob = new Blob([content], { type: name.endsWith('.md') ? 'text/markdown' : 'text/html' })
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank')
@@ -54,8 +71,8 @@ function handlePreview() {
 
 function handleDownload() {
   if (isEphemeral.value) {
-    const content = props.artifact?.content || ''
-    const name = props.artifact?.artifactName || 'artifact.txt'
+    const content = displayContent.value
+    const name = displayName.value
     const blob = new Blob([content], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -72,17 +89,16 @@ function handleDownload() {
 <template>
   <div class="artifact-preview-card">
     <div class="artifact-header">
-      <span class="artifact-name">{{ artifact?.artifactName || '产物' }}</span>
-      <span v-if="artifact?.currentVersion" class="artifact-version">v{{ artifact.currentVersion }}</span>
+      <span class="artifact-name">{{ displayName }}</span>
     </div>
 
     <!-- code/website/data/stylesheet: NCode 代码块 -->
-    <div v-if="showCodeBlock && artifact?.content" class="artifact-code">
-      <NCode :code="artifact.content" :language="codeLanguage" />
+    <div v-if="showCodeBlock && displayContent" class="artifact-code">
+      <NCode :code="displayContent" :language="codeLanguage" />
     </div>
 
     <!-- document: Markdown 渲染 -->
-    <div v-if="showDocument && artifact?.content" class="artifact-markdown">
+    <div v-if="showDocument && displayContent" class="artifact-markdown">
       <div class="markdown-body" v-html="renderedMd" />
     </div>
 
