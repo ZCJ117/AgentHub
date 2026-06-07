@@ -149,7 +149,7 @@ public class BridgedAgent extends BaseAgent implements StructuredStreamCapable {
             // Build conversation context from recent history
             String contextualMessage = buildContextualMessage(userMessage, conversationId);
 
-            String sessionId = processManager.getSessionId(agentId);
+            String sessionId = processManager.getSessionId(agentId, conversationId);
             Map<String, Object> chatPayload = new java.util.LinkedHashMap<>();
             chatPayload.put("message", contextualMessage);
             chatPayload.put("conversationId", conversationId);

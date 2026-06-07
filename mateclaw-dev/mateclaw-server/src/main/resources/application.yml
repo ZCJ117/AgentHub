@@ -206,7 +206,6 @@ mateclaw:
   local-cli:
     node-bin: "node"
     adapters-dir: "adapters"
-    opencode-bin: "C:/Users/86178/AppData/Roaming/npm/node_modules/opencode-ai/bin/opencode.exe"
     timeout-seconds: 300
     force-kill-seconds: 5
 

@@ -188,6 +188,6 @@ export const useArtifactStore = defineStore('artifact', () => {
     artifacts, current, versions, diffResult, deployStatus, deployHistory, loading,
     loadList, loadDetail, loadVersions, loadDiff,
     restoreVersion, deploy, loadDeployStatus, loadDeployHistory, updateTags,
-    loadContent, loadVersionContent, handleArtifactPreview
+    loadContent, loadVersionContent, handleArtifactPreview, saveEphemeralArtifacts
   }
 })

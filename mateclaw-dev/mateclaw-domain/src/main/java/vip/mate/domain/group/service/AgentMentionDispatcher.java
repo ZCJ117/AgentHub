@@ -283,12 +283,12 @@ public class AgentMentionDispatcher {
         DagTask dagTask = new DagTask(agentName, agent, task, null, claudeMdPath);
         TaskNode node = new TaskNode(agentName, dagTask);
 
-        streamTracker.broadcastObject(conversationId, "agent_message_start", Map.of(
-                "agentName", agentName,
-                "agentId", String.valueOf(agent.getId()),
-                "taskDescription", task,
-                "avatarUrl", agent.getAvatarUrl()
-        ));
+        Map<String, Object> startEvent = new LinkedHashMap<>();
+        startEvent.put("agentName", agentName);
+        startEvent.put("agentId", String.valueOf(agent.getId()));
+        startEvent.put("taskDescription", task);
+        startEvent.put("avatarUrl", agent.getAvatarUrl());
+        streamTracker.broadcastObject(conversationId, "agent_message_start", startEvent);
 
         scheduleNode(node, conversationId, semaphore, () -> {
             ChatStreamTracker.CompletionResult cr = streamTracker.completeAndConsumeIfLast(conversationId);
@@ -543,12 +543,12 @@ public class AgentMentionDispatcher {
                 }
 
                 // Broadcast agent_message_start so the frontend creates a dedicated bubble
-                streamTracker.broadcastObject(conversationId, "agent_message_start", Map.of(
-                        "agentName", "Agent01",
-                        "agentId", orchestratorAgentId[0] != null ? orchestratorAgentId[0] : "0",
-                        "taskDescription", "任务执行结果汇总",
-                        "avatarUrl", agent01Holder[0] != null ? agent01Holder[0].getAvatarUrl() : null
-                ));
+                Map<String, Object> startEvent = new LinkedHashMap<>();
+                startEvent.put("agentName", "Agent01");
+                startEvent.put("agentId", orchestratorAgentId[0] != null ? orchestratorAgentId[0] : "0");
+                startEvent.put("taskDescription", "任务执行结果汇总");
+                startEvent.put("avatarUrl", agent01Holder[0] != null ? agent01Holder[0].getAvatarUrl() : null);
+                streamTracker.broadcastObject(conversationId, "agent_message_start", startEvent);
 
                 // 6. Call Agent01 and stream the summary
                 StringBuilder summaryText = new StringBuilder();
@@ -793,6 +793,16 @@ public class AgentMentionDispatcher {
                             "delta", delta.content(),
                             "agentName", agentName
                     ));
+                }
+                if (delta.isEvent()) {
+                    String eventType = delta.eventType();
+                    Map<String, Object> eventData = delta.eventData();
+                    if (eventType != null && !eventType.isBlank() && eventData != null) {
+                        // Tag the event with the agent name for frontend routing
+                        Map<String, Object> enriched = new LinkedHashMap<>(eventData);
+                        enriched.put("agentName", agentName);
+                        streamTracker.broadcastObject(conversationId, eventType, enriched);
+                    }
                 }
             })
             .doOnComplete(() -> {

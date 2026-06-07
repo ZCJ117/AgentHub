@@ -70,11 +70,11 @@ public class LocalCliProcessManager {
             String workDir
     ) {}
 
-    /** Persistent Claude Code session IDs for --resume across chat requests */
+    /** Persistent Claude Code session IDs for --resume across chat requests, keyed by agentId:conversationId */
     private final ConcurrentHashMap<String, String> sessionIds = new ConcurrentHashMap<>();
 
-    public String getSessionId(String agentId) {
-        return sessionIds.get(agentId);
+    public String getSessionId(String agentId, String conversationId) {
+        return sessionIds.get(agentId + ":" + conversationId);
     }
 
     // ── Public API ───────────────────────────────────────────────────
@@ -430,8 +430,10 @@ public class LocalCliProcessManager {
             case "session_info" -> {
                 if (frame.getPayload() != null && frame.getPayload().get("sessionId") != null) {
                     String sid = frame.getPayload().get("sessionId").toString();
-                    sessionIds.put(agentId, sid);
-                    log.info("[CliPM] Captured session_id={} for agent={}", sid, agentId);
+                    String cid = frame.getPayload().get("conversationId") != null
+                            ? frame.getPayload().get("conversationId").toString() : "";
+                    sessionIds.put(agentId + ":" + cid, sid);
+                    log.info("[CliPM] Captured session_id={} for agent={} conv={}", sid, agentId, cid);
                 }
             }
             case "pong" -> {} // heartbeat response, ignore
@@ -453,7 +455,7 @@ public class LocalCliProcessManager {
         java.nio.file.Path dir = java.nio.file.Path.of(ctx.workDir());
         if (!java.nio.file.Files.isDirectory(dir)) return;
 
-        try (var stream = java.nio.file.Files.list(dir)) {
+        try (var stream = java.nio.file.Files.walk(dir, 3)) {
             stream.filter(java.nio.file.Files::isRegularFile)
                   .filter(p -> isPreviewableFile(p.getFileName().toString()))
                   .forEach(p -> emitFileArtifactPreview(agentId, p));

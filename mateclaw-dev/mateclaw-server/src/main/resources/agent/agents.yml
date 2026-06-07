@@ -11,7 +11,7 @@ ai:
           module:
             ai-api:
               base-url: https://api.deepseek.com
-              api-key:                              #在平台申请的API Key
+              api-key:                             #在平台申请的API Key
               completions-path: v1/chat/completions
               embeddings-path: v1/embeddings
             chat-model:

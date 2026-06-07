@@ -2183,7 +2183,10 @@ public class ChatController {
                 if ("write_file".equals(toolName)
                         && Boolean.TRUE.equals(data.getOrDefault("success", false))) {
                     String wsPath = String.valueOf(data.getOrDefault("workspaceBasePath", ""));
-                    String resultStr = String.valueOf(data.getOrDefault("result", ""));
+                    // CLI adapters send "content", graph agents send "result" — accept either
+                    Object rawResult = data.get("result");
+                    if (rawResult == null) rawResult = data.get("content");
+                    String resultStr = rawResult != null ? String.valueOf(rawResult) : "";
                     if (!wsPath.isBlank() && !resultStr.isBlank()) {
                         interceptWriteFileForPreview(conversationId, resultStr, wsPath);
                     }

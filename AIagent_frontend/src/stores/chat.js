@@ -75,13 +75,8 @@ export const useChatStore = defineStore('chat', () => {
       const convId = conversationId.value
       console.log('[restoreEphemeral] current convId:', convId, 'stored artifacts:', savedArtifacts.map(a => ({ id: a.id, convId: a.conversationId, name: a.artifactName })))
 
-      // Try exact match first, then fall back to all artifacts (conversationId may differ
-      // between SSE stream and page load for group/orchestrated chats)
-      let convArtifacts = savedArtifacts.filter(a => a.conversationId === convId)
-      if (convArtifacts.length === 0) {
-        console.log('[restoreEphemeral] no exact conv match, using all artifacts as fallback')
-        convArtifacts = savedArtifacts
-      }
+      const convArtifacts = savedArtifacts.filter(a => a.conversationId === convId)
+      if (convArtifacts.length === 0) return
 
       // Also ensure artifacts are in the Pinia store
       const artifactStore = useArtifactStore()
@@ -92,15 +87,17 @@ export const useChatStore = defineStore('chat', () => {
         }
       }
 
-      // Upgrade all assistant messages that don't already have a preview_card
-      // (there could be multiple if the conversation had multiple turns)
+      // Only upgrade messages whose ID matches each artifact's saved messageId
       let upgraded = 0
-      for (let i = messages.value.length - 1; i >= 0; i--) {
-        const m = messages.value[i]
-        if (m.role === 'assistant' && m.messageType !== 'preview_card') {
-          updateMessage(m.id, {
+      for (const art of convArtifacts) {
+        if (!art.messageId) continue
+        const msg = messages.value.find(m => String(m.id) === String(art.messageId))
+        if (msg && msg.role === 'assistant' && msg.messageType !== 'preview_card') {
+          const existingRefs = msg.artifactRefs || []
+          const newRefs = existingRefs.includes(art.id) ? existingRefs : [...existingRefs, art.id]
+          updateMessage(msg.id, {
             messageType: 'preview_card',
-            artifactRefs: refIds
+            artifactRefs: newRefs
           })
           upgraded++
         }
@@ -311,6 +308,10 @@ export const useChatStore = defineStore('chat', () => {
     sse.on('artifact_preview', (data) => {
       const artifactStore = useArtifactStore()
       if (data.artifactId) {
+        // Only associate with the current message if this is a NEW artifact.
+        // Re-scanned files from previous turns already belong to their original message.
+        const isNew = !artifactStore.artifacts.find(a => a.id === data.artifactId)
+
         artifactStore.handleArtifactPreview({
           artifactId: data.artifactId,
           artifactType: data.type || 'file',
@@ -319,15 +320,20 @@ export const useChatStore = defineStore('chat', () => {
           previewUrl: data.previewUrl,
           content: data.content || ''
         })
-        // Upgrade the last assistant message to a preview_card so it persists with the conversation
-        for (let i = messages.value.length - 1; i >= 0; i--) {
-          const m = messages.value[i]
-          if (m.role === 'assistant' && m.messageType === 'text') {
-            updateMessage(m.id, {
+        if (isNew) {
+          // Tag artifact with local message ID for later matching on restore
+          const art = artifactStore.artifacts.find(a => a.id === data.artifactId)
+          if (art) {
+            art._localMsgId = assistantId
+            artifactStore.saveEphemeralArtifacts()
+          }
+          // Upgrade the current turn's assistant message to a preview_card
+          const msg = messages.value.find(m => m.id === assistantId)
+          if (msg && msg.role === 'assistant' && msg.messageType === 'text') {
+            updateMessage(assistantId, {
               messageType: 'preview_card',
               artifactRefs: [data.artifactId]
             })
-            break
           }
         }
       }
@@ -416,6 +422,18 @@ export const useChatStore = defineStore('chat', () => {
         if (idx !== -1) {
           messages.value[idx] = { ...messages.value[idx], id: serverMsgId }
         }
+        // Update ephemeral artifacts: swap _localMsgId → messageId so restore
+        // can match artifacts to the correct message on page reload
+        const artifactStore = useArtifactStore()
+        let artifactChanged = false
+        for (const art of artifactStore.artifacts) {
+          if (art._localMsgId === assistantId) {
+            delete art._localMsgId
+            art.messageId = serverMsgId
+            artifactChanged = true
+          }
+        }
+        if (artifactChanged) artifactStore.saveEphemeralArtifacts()
       }
 
       updateMessage(serverMsgId || assistantId, {
@@ -439,12 +457,10 @@ export const useChatStore = defineStore('chat', () => {
       isStreaming.value = false
       sse.disconnect()
 
-      // Reload conversation list so new conversation appears in sidebar
-      const convStore = useConversationStore()
-      await convStore.loadList()
-
       // Update browser URL for new chats without triggering Vue Router re-render
       if (conversationId.value && !router.currentRoute.value.params.conversationId) {
+        const convStore = useConversationStore()
+        await convStore.loadList()
         const conv = convStore.conversations.find(
           c => String(c.conversationId) === String(conversationId.value)
         )
@@ -455,6 +471,11 @@ export const useChatStore = defineStore('chat', () => {
           const hashPath = `#/chat/${conv.conversationId}`
           history.replaceState(history.state, '', window.location.pathname + hashPath)
         }
+      } else {
+        // Existing conversation: fire-and-forget sidebar refresh.
+        // Don't await — blocking here risks reactivity chains that can
+        // trigger unwanted re-renders of message bubbles.
+        useConversationStore().loadList()
       }
     })
 

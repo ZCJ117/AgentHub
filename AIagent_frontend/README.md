@@ -147,11 +147,3 @@ Apple 风格，SF Pro 字体，毛玻璃效果，大圆角 (14px)，柔和阴影
 ```
 http://localhost:3000/api/v1/*  →  http://127.0.0.1:18088/api/v1/*
 ```
-
-## 环境变量
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `VITE_API_BASE` | 无 (使用 proxy) | API 基础 URL |
-
-参见 `.env.development` 和 `.env.production`。

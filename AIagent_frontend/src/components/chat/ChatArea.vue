@@ -37,8 +37,10 @@ const headerSubtitle = computed(() => {
 
 const agentNames = computed(() => {
   const members = props.conversation?.members
-  if (!members || !Array.isArray(members)) return []
-  return members.map(m => m.agentName).filter(Boolean)
+  if (!members || !Array.isArray(members)) return ['用户']
+  const names = members.map(m => m.agentName).filter(Boolean)
+  names.push('用户')
+  return names
 })
 
 const headerAvatar = computed(() => {

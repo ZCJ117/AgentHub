@@ -104,6 +104,7 @@ rl.on('line', (line) => {
             let buffer = '';
             let receivedCount = 0;
             let forwardedCount = 0;
+            const toolIdToName = {};  // track toolId → toolName for tool_result enrichment
 
             child.stdout.on('data', (chunk) => {
                 logStream.write(chunk);
@@ -135,8 +136,10 @@ rl.on('line', (line) => {
                                     for (const block of blocks) {
                                         if (block.type === 'text' && block.text)
                                             sendTextDelta(block.text);
-                                        else if (block.type === 'tool_use')
+                                        else if (block.type === 'tool_use') {
+                                            toolIdToName[block.id] = block.name;
                                             sendNow('tool_call', { toolName: block.name, toolInput: block.input, toolId: block.id });
+                                        }
                                     }
                                 }
                                 break;
@@ -145,17 +148,18 @@ rl.on('line', (line) => {
                                 if (event.delta?.text) sendTextDelta(event.delta.text);
                                 break;
                             case 'tool_use':
+                                toolIdToName[event.id] = event.name;
                                 sendNow('tool_call', { toolName: event.name, toolInput: event.input, toolId: event.id });
                                 break;
                             case 'tool_result':
-                                sendNow('tool_result', { toolId: event.tool_use_id, content: event.content });
+                                sendNow('tool_result', { toolId: event.tool_use_id, toolName: toolIdToName[event.tool_use_id] || '', content: event.content, success: true });
                                 break;
                             case 'user': {
                                 const userBlocks = event.message?.content;
                                 if (userBlocks && Array.isArray(userBlocks)) {
                                     for (const block of userBlocks) {
                                         if (block.type === 'tool_result')
-                                            sendNow('tool_result', { toolId: block.tool_use_id, content: block.content });
+                                            sendNow('tool_result', { toolId: block.tool_use_id, toolName: toolIdToName[block.tool_use_id] || '', content: block.content, success: true });
                                     }
                                 }
                                 break;

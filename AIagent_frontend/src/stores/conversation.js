@@ -32,13 +32,12 @@ export const useConversationStore = defineStore('conversation', () => {
     const base = conversations.value.find(c =>
       c.conversationId === activeId.value || String(c.id) === String(activeId.value)
     )
-    if (!base) return null
-
-    const cacheKey = base.conversationId || String(base.id)
+    const cacheKey = String(activeId.value)
     const detail = conversationDetailCache.value.get(cacheKey)
-    if (detail) {
-      return { ...base, members: detail.members || [] }
-    }
+
+    if (!base && !detail) return null
+    if (!base) return detail
+    if (detail) return { ...base, members: detail.members || [] }
     return base
   })
 
@@ -169,6 +168,14 @@ export const useConversationStore = defineStore('conversation', () => {
     }
   }
 
+  function cacheDetail(convId, detail) {
+    const cacheKey = String(convId)
+    conversationDetailCache.value.set(cacheKey, detail)
+    if (detail.conversationId && detail.conversationId !== cacheKey) {
+      conversationDetailCache.value.set(detail.conversationId, detail)
+    }
+  }
+
   async function createGroup(config) {
     const data = await createGroupConversation(config)
     await loadList()
@@ -179,7 +186,7 @@ export const useConversationStore = defineStore('conversation', () => {
     conversations, activeId, loading, searchKeyword, filter,
     currentPage, hasMore, loadingMore,
     activeConversation, sortedConversations, filteredConversations, unreadTotal,
-    loadList, loadMore, setActive, togglePin, toggleArchive, deleteConversation, createGroup,
+    loadList, loadMore, setActive, cacheDetail, togglePin, toggleArchive, deleteConversation, createGroup,
     pinnedMessages, loadPinnedMessages
   }
 })
